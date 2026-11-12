@@ -36,9 +36,13 @@ if (
     )
 
 _db_url = os.environ.get("DATABASE_URL", "sqlite:///knxdoit.db")
-# Render/Heroku "postgres://" verir; SQLAlchemy "postgresql://" ister
-if _db_url.startswith("postgres://"):
-    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+# Render "postgres://" ya da "postgresql://" verir. SQLAlchemy 2.1'de
+# varsayılan sürücü psycopg (v3) oldu; biz psycopg2 kullanıyoruz, bu
+# yüzden sürücüyü adresle açıkça belirtiyoruz.
+for _prefix in ("postgres://", "postgresql://"):
+    if _db_url.startswith(_prefix):
+        _db_url = "postgresql+psycopg2://" + _db_url[len(_prefix):]
+        break
 app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
