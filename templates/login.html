@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Giriş{% endblock %}
+
+{% block content %}
+<div class="auth">
+  <form method="post" class="card">
+    <h2>Giriş Yap</h2>
+
+    <label>
+      Email
+      <input name="email" type="email" required>
+    </label>
+
+    <label>
+      Şifre
+      <input name="password" type="password" required>
+    </label>
+
+    <button>Giriş Yap</button>
+
+    <a href="/register">Hesabın yok mu?</a>
+  </form>
+</div>
+{% endblock %}

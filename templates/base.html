@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KNXdoit - {% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav class="nav">
+    <a class="logo" href="/">KNXdoit</a>
+    <div class="nav-links">
+      {% if current_user.is_authenticated %}
+        <span class="trial">
+          Trial · {{ current_user.days_left() }} gün ·
+          {{ current_user.project_count() }}/3 proje
+        </span>
+        <a href="/project">Proje</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/logout">Çıkış</a>
+      {% else %}
+        <a href="/login">Giriş</a>
+        <a class="nav-btn" href="/register">Ücretsiz Dene</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="flash">
+        {% for m in messages %}
+          <div>{{ m }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</body>
+</html>

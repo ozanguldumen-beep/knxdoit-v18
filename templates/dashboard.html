@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dash">
+  <div class="dash-head">
+    <h1>Projelerim</h1>
+
+    <a class="primary small" href="/project/new">
+      + Yeni Proje
+    </a>
+  </div>
+
+  {% if projects %}
+    {% for p in projects %}
+      <div class="project-row">
+        <b>{{ p.name }}</b>
+        <span>
+          {{ p.ets_version }} ·
+          {{ p.created_at.strftime('%d.%m.%Y') }}
+        </span>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">
+      Henüz proje yok.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

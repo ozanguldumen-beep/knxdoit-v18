@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Proje{% endblock %}
+
+{% block content %}
+<div class="project-app">
+
+  <aside class="left-panel">
+
+    <section>
+      <h3>PROJE</h3>
+      <label class="field-label">
+        Proje Adı
+        <input id="projectName" value="KNXdoit Projesi">
+      </label>
+    </section>
+
+    <section>
+      <h3>KAT / ODA</h3>
+
+      <button id="addFloor" class="soft">
+        + Kat Ekle
+      </button>
+
+      <div id="floorTabs" class="tabs"></div>
+
+      <div class="two">
+        <button id="addRoom" class="soft">
+          + Oda Ekle
+        </button>
+
+        <button id="addCollector" class="soft">
+          + Kollektör
+        </button>
+      </div>
+    </section>
+
+    <section>
+      <h3>ODAYA CİHAZ EKLE</h3>
+
+      <select id="roomSelect"></select>
+
+      <div id="roomDevices" class="device-list"></div>
+    </section>
+
+    <section>
+      <h3>PANO ÜRÜNLERİ</h3>
+
+      <div id="panelProducts" class="device-list"></div>
+    </section>
+
+    <section class="actions">
+      <button id="clearBtn" class="soft">
+        Pano Temizle
+      </button>
+
+      <button id="saveBtn" class="soft">
+        Projeyi Kaydet
+      </button>
+
+      <button id="pdfBtn" class="blue">
+        PDF Çıktı
+      </button>
+
+      <button id="knxBtn" class="green">
+        .knxproj
+      </button>
+    </section>
+
+    <section class="status-box">
+      <h2>Proje Sağlığı</h2>
+      <div id="status">Sistem hazır.</div>
+      <div id="ruleWarnings"></div>
+    </section>
+
+  </aside>
+
+  <main class="center-panel">
+
+    <header class="project-toolbar">
+
+      <div class="toolbar-title">
+        <h1>KNXdoit v18</h1>
+        <p>
+          Kat, oda, pano + KNX kural kontrolü.
+        </p>
+      </div>
+
+      <div class="stats">
+        <div>
+          <b id="roomCount">0</b>
+          <span>Oda</span>
+        </div>
+
+        <div>
+          <b id="productCount">0</b>
+          <span>Ürün</span>
+        </div>
+
+        <div>
+          <b id="gaCount">0</b>
+          <span>GA</span>
+        </div>
+      </div>
+
+      <div class="zoom-box">
+        <button id="zoomOut">-</button>
+
+        <input
+          id="zoomRange"
+          type="range"
+          min="50"
+          max="150"
+          value="100"
+        >
+
+        <button id="zoomIn">+</button>
+        <button id="zoomReset">100%</button>
+      </div>
+
+      <select id="etsVersion">
+        <option>ETS6</option>
+        <option>ETS5</option>
+      </select>
+
+    </header>
+
+    <div class="workspace-scroll">
+      <div id="zoomContent" class="zoom-content">
+
+        <div class="drawing-sheet">
+
+          <div class="sheet-title">
+            Kat Planı + Gerçek Pano Görünümü
+          </div>
+
+          <div class="sheet-grid">
+
+            <div>
+              <h4 id="floorTitle">
+                Zemin Kat Odaları
+              </h4>
+
+              <div
+                id="roomsCanvas"
+                class="rooms-canvas">
+              </div>
+
+              <h4>Kollektörler</h4>
+
+              <div
+                id="collectorsCanvas"
+                class="collectors-canvas">
+              </div>
+            </div>
+
+            <div>
+              <h4 id="panelTitle">
+                Zemin Kat KNX Panosu
+              </h4>
+
+              <canvas
+                id="panelCanvas"
+                width="980"
+                height="720">
+              </canvas>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <aside class="right-panel">
+    <h2 class="rp-title">Fiziksel Adresler</h2>
+    <p class="rp-hint">Alan.Hat.Cihaz · her kat bir hat</p>
+    <div id="paList"></div>
+
+    <h2 class="rp-title">Grup Adresleri</h2>
+    <p class="rp-hint">Ana = fonksiyon · Orta = kat · Alt = sıra</p>
+    <div id="gaList"></div>
+  </aside>
+
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <h2 id="modalTitle">Başlık</h2>
+
+    <div id="modalBody"></div>
+
+    <div class="modal-actions">
+      <button id="modalCancel" class="soft">
+        İptal
+      </button>
+
+      <button id="modalOk" class="blue">
+        Tamam
+      </button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/static/app.js"></script>
+{% endblock %}
