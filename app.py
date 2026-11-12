@@ -23,6 +23,18 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get(
     "SECRET_KEY", "knxdoit-v18-development-only"
 )
+# Canlıda (REQUIRE_DATABASE_URL=1) DATABASE_URL yoksa uygulama
+# BAŞLAMAZ: verilerin geçici bir SQLite dosyasına yazılıp
+# kaybolmasını engeller.
+if (
+    os.environ.get("REQUIRE_DATABASE_URL") == "1"
+    and not os.environ.get("DATABASE_URL")
+):
+    raise RuntimeError(
+        "DATABASE_URL tanımlı değil. Render > Environment kısmına "
+        "Postgres 'Internal Database URL' değerini ekleyin."
+    )
+
 _db_url = os.environ.get("DATABASE_URL", "sqlite:///knxdoit.db")
 # Render/Heroku "postgres://" verir; SQLAlchemy "postgresql://" ister
 if _db_url.startswith("postgres://"):
@@ -497,7 +509,11 @@ def healthz():
     # Render sağlık kontrolü: uygulama + veritabanı bağlantısı
     try:
         db.session.execute(db.text("SELECT 1"))
-        return jsonify({"ok": True, "db": "ok"})
+        return jsonify({
+            "ok": True,
+            "db": "ok",
+            "engine": db.engine.dialect.name
+        })
     except Exception as e:  # noqa: BLE001
         return jsonify({"ok": False, "db": str(e)[:200]}), 503
 
