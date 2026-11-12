@@ -492,6 +492,16 @@ def new_project():
 # API
 # --------------------------------
 
+@app.route("/healthz")
+def healthz():
+    # Render sağlık kontrolü: uygulama + veritabanı bağlantısı
+    try:
+        db.session.execute(db.text("SELECT 1"))
+        return jsonify({"ok": True, "db": "ok"})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"ok": False, "db": str(e)[:200]}), 503
+
+
 @app.route("/api/save", methods=["POST"])
 @login_required
 def save_project():
