@@ -1,0 +1,39 @@
+# KNXdoit v18 - Render altyapısı (Blueprint)
+# Katmanlar:
+#   1) knxdoit-v18-db : Postgres (ücretli, point-in-time recovery, dış erişim kapalı)
+#   2) knxdoit-v18    : Flask uygulaması (Starter, uyumaz)
+# DATABASE_URL Render içinde veritabanından otomatik alınır; şifre repoda yoktur.
+# SECRET_KEY repoda YOKTUR (sync: false) - değeri Render panelinde durur.
+
+databases:
+  - name: knxdoit-v18-db
+    databaseName: knxdoit_v18_db
+    user: knxdoit_v18_db_user
+    plan: basic-256mb
+    region: frankfurt
+    postgresMajorVersion: "17"
+    diskSizeGB: 5
+    ipAllowList: []
+
+services:
+  - type: web
+    name: knxdoit-v18
+    runtime: python
+    plan: starter
+    region: frankfurt
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: knxdoit-v18-db
+          property: connectionString
+      - key: SECRET_KEY
+        sync: false
+      - key: REQUIRE_DATABASE_URL
+        value: "1"
+      - key: PYTHON_VERSION
+        value: 3.13.5
