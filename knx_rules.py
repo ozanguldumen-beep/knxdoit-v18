@@ -27,7 +27,7 @@ GA_SUB_MAX = 255
 from catalog import (  # noqa: E402  (tek kaynak)
     DEFAULT_BUS_MA, CATEGORY_LABEL, COMPAT, COMPAT_NOTE, GA_GROUPS,
     DEVICE_BY_TYPE, LOAD_TYPES, BUS_TYPES, OUTPUT_CATEGORIES,
-    device_objects, device_bus_ma,
+    device_objects, device_bus_ma, device_relays,
 )
 
 # Geriye uyumluluk adları
@@ -316,6 +316,11 @@ def check_floor(floor, line_no):
         cat = p.get("category")
         if cat in OUTPUT_CATEGORIES:
             have[cat] = have.get(cat, 0) + max(0, _int(p.get("channels"), 0))
+    # Akubela vb. panellerin dahili röleleri de röle kanalı sayılır
+    for _, d in _room_devices(floor):
+        r = device_relays(d)
+        if r:
+            have["relay"] = have.get("relay", 0) + r * max(1, _int(d.get("count", 1), 1))
     free = dict(have)
 
     demand = {}   # yük tipi -> adet

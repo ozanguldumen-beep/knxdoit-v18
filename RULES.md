@@ -1,4 +1,4 @@
-# KNXdoit v21 — Kural Listesi
+# KNXdoit v22 — Kural Listesi
 
 Kodda karşılığı: `knx_rules.py` (proje kuralları) ve `knx_wiring.py` (elle çekilen kablolar). Ekran, PDF ve `.knxproj` aynı hesaptan beslenir.
 Durum: 🔴 Hata (proje uygulanmamalı) · 🟠 Uyarı (kontrol edilmeli) · 🟢 Uygun
@@ -112,6 +112,15 @@ Her yükün BİRİNCİL kanal tipi vardır; birincil dolarsa izinli ALTERNATİF 
 Klima ve VRF için Kablo Çekim Listesi'ne iki satır düşer: gateway → iç ünite **kontrol hattı**
 ve panodan **doğrudan enerji** (ayrı sigorta). Tuş panellerinde (1/2/4/6/8) her tuşa bir grup adresi.
 Grup adresi ana grupları: 1 Aydınlatma · 2 Perde · 3 Isıtma/HVAC · 4 Tuş/Sensör · 5 Genel Yükler · 6 Klima.
+
+## Akubela ürünleri (v22)
+Sol listede en üstte. Hypanel Elite 10, KeyPlus KS03, KNX Kasası PS51-KS41, Lux RT61, Pro, Supreme,
+Ultra; Aura K32-B4 4 tuş (çoklu / tekli), Aura K32-M termostat (çoklu / tekli). Stok kodu olanlar katalogda.
+
+Dahili röle çıkışı olanlar (Lux, Pro, Supreme, Ultra, PS51-KS41: 2 röle) odada **R1/R2** kanalı olarak
+görünür; lamba / on-off / solenoid vana gibi röle yükleri doğrudan bunlara bağlanabilir ve röle
+kapasitesine sayılır. Dim lamba bu rölelere bağlanamaz.
+⚠️ Dahili röle yük akımı, bus akımı (varsayılan 10 mA) ve panel beslemesi datasheet'ten doğrulanmalı.
 
 ## Henüz yok (sonraki sürümler)
 - Otomatik kanal ataması ("Otomatik bağla") — şimdilik kablolar elle çekiliyor

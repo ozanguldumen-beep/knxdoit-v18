@@ -125,7 +125,22 @@ $("modalBody").addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.tagName === "INPUT") $("modalOk").click();
 });
 
+// Dahili röleli paneller (Akubela): "dr_<cihazId>_<örnek>" sahte ürün
+function relayCount(dev) { return Number((DEV[dev.type] || {}).relays || 0); }
+const relayProdId = (devId, k) => `dr_${devId}_${k}`;
+
 function findProduct(prodId) {
+  if (String(prodId).startsWith("dr_")) {
+    const m = String(prodId).match(/^dr_(.+)_(\d+)$/);
+    if (!m) return null;
+    const d = findDevice(m[1]);
+    const k = Number(m[2]);
+    if (!d || k >= d.dev.count || !relayCount(d.dev)) return null;
+    return {
+      floor: d.floor, panel: { name: d.room.name, products: [] },
+      prod: { id: prodId, name: `${d.dev.label} ${k + 1} dahili röle`, category: "relay", channels: relayCount(d.dev) }
+    };
+  }
   for (const f of state.floors)
     for (const p of f.panels)
       for (const pr of p.products)
@@ -326,9 +341,23 @@ function roomHtml(r) {
         <span class="ic">${info.icon}</span><span class="n">${k + 1}</span></button>`;
     })
   ).join("");
+  const occ = occupancy();
+  const relays = r.devices.filter(d => relayCount(d)).flatMap(d =>
+    Array.from({ length: d.count }, (_, k) => {
+      const pid = relayProdId(d.id, k);
+      const o = occ[pid] || {};
+      const btns = Array.from({ length: relayCount(d) }, (_, ci) => {
+        const slot = o[ci];
+        const t = slot ? targetType(slot.link.to) : null;
+        return `<button class="chbtn mini ${slot ? "used c-" + t : ""}" id="ch-${pid}-${ci}" data-prod="${pid}" data-ch="${ci}"
+          title="${esc(d.label)} ${k + 1} · dahili röle R${ci + 1}${slot ? ": " + esc(targetName(slot.link.to)) : " (boş)"}">${slot ? (DEV[t] || {}).icon || "•" : "R"}<span>${ci + 1}</span></button>`;
+      }).join("");
+      return `<div class="relayrow"><span>${esc(d.label)} ${k + 1} · dahili röle</span>${btns}</div>`;
+    })
+  ).join("");
   return `<div class="rbox" data-room="${r.id}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;min-height:${r.h}px">
     <div class="rhdr" data-drag="room:${r.id}"><span>${esc(r.name)}</span><small>${total} cihaz</small></div>
-    <div class="chips">${chips}</div>
+    <div class="chips">${chips}</div>${relays}
     <button class="addbtn" data-add-dev="${r.id}">+ Cihaz Ekle</button>
   </div>`;
 }
@@ -726,7 +755,8 @@ function connectEnergy(to) {
   pick = null;
   $("hint").textContent = HINTS.energy;
   changed();
-  toast(res.warn || `Bağlandı: ${found.prod.name} K${state.links.at(-1).ch + 1} → ${targetName(to)}`,
+  const chTag = String(found.prod.id).startsWith("dr_") ? "R" : "K";
+  toast(res.warn || `Bağlandı: ${found.prod.name} ${chTag}${state.links.at(-1).ch + 1} → ${targetName(to)}`,
     res.warn ? "warn" : "info");
 }
 
@@ -812,6 +842,14 @@ function onDelete(e, { ch, chip, vana, ptitle, hdr }) {
 }
 
 function removeDeviceInstance(room, dev, k) {
+  // bu örneğin dahili rölelerine bağlı kablolar silinir, sonrakiler kayar
+  state.links = state.links
+    .filter(l => l.prod !== relayProdId(dev.id, k))
+    .map(l => {
+      const m = String(l.prod).match(/^dr_(.+)_(\d+)$/);
+      return (m && m[1] === dev.id && Number(m[2]) > k)
+        ? { ...l, prod: relayProdId(dev.id, Number(m[2]) - 1) } : l;
+    });
   // k'ye bağlı kabloları sil, sonrakileri bir kaydır
   state.links = state.links
     .filter(l => !(l.to.kind === "dev" && l.to.dev === dev.id && l.to.k === k))
@@ -861,9 +899,12 @@ function addDevice(room, catId, qty, label) {
 function deviceGroupsHtml(btnClass, attr, chosen) {
   const groups = {};
   ROOM_DEVICES.forEach(d => (groups[d.group] = groups[d.group] || []).push(d));
-  return Object.entries(groups).map(([g, list]) => `
+  // Kendi markamız (Akubela) listenin başında
+  const order = Object.entries(groups).sort(([a], [b]) => (b === "Akubela") - (a === "Akubela"));
+  return order.map(([g, list]) => `
     <div class="ed-group">${esc(g)}</div>
-    ${list.map(d => `<button type="button" class="${btnClass} ${d.id === chosen ? "on" : ""}" ${attr}="${d.id}">
+    ${list.map(d => `<button type="button" class="${btnClass} ${d.id === chosen ? "on" : ""}" ${attr}="${d.id}"
+        title="${esc([d.desc, d.sku ? "Stok kodu: " + d.sku : "", d.relays ? d.relays + " dahili röle çıkışı" : ""].filter(Boolean).join(" · "))}">
         <span class="ic">${d.icon}</span><span class="nm">${esc(d.label)}</span>
         <small class="${d.kind === "bus" ? "k" : d.kind === "control" ? "c" : "e"}">${d.kind === "bus" ? "KNX" : d.kind === "control" ? "Gateway" : "230V"}</small>
       </button>`).join("")}`).join("");

@@ -904,3 +904,12 @@ a.project-row:hover { border-color: #185fa5; }
 .chgrid { max-width: 330px; }
 
 .lg-ctl { background: repeating-linear-gradient(90deg,#0284c7 0 6px,transparent 6px 10px); }
+
+/* v22: panel dahili röleleri (Akubela) */
+.relayrow {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin: 0 6px 6px; padding: 4px 6px; border-radius: 8px;
+  background: #fff; border: 1px dashed #94a3b8; font-size: 10px; color: #475569; font-weight: 700;
+}
+.relayrow > span { margin-right: 4px; }
+.chbtn.mini { width: 26px; height: 30px; font-size: 10px; }

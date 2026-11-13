@@ -17,6 +17,7 @@ Kablo kesitleri ÖRNEKTİR; kesit ve sigortayı elektrikçi belirler.
 
 from knx_rules import _issue, _int
 from catalog import (
+    device_relays, relay_prod_id,
     COMPAT, COMPAT_NOTE, CATEGORY_LABEL, DEVICE_BY_TYPE,
     LOAD_TYPES as ENERGY_TYPES, BUS_TYPES, CONTROL_TYPES,
     GATEWAY_CATEGORIES,
@@ -104,6 +105,17 @@ def _index(editor):
             for d in r.get("devices", []) or []:
                 idx["dev"][d.get("id")] = d
                 idx["room_of_dev"][d.get("id")] = r
+                # Dahili röleli paneller: her örnek bir "ürün" gibi kanallı
+                nrel = device_relays(d)
+                if nrel:
+                    label = d.get("label") or "Panel"
+                    for k in range(max(1, _int(d.get("count", 1), 1))):
+                        pid = relay_prod_id(d.get("id"), k)
+                        idx["prod"][pid] = {
+                            "id": pid, "name": f"{label} {k + 1} dahili röle",
+                            "category": "relay", "channels": nrel,
+                        }
+                        idx["panel_of_prod"][pid] = {"name": r.get("name", "Oda")}
         for p in f.get("panels", []) or []:
             idx["panel"][p.get("id")] = p
             for pr in p.get("products", []) or []:
@@ -240,6 +252,9 @@ def check_wiring(editor):
             out = f"K{ch + 1} ({pair})"
         else:
             out = f"K{ch + 1}"
+        is_builtin = str(prod.get("id", "")).startswith("dr_")
+        if is_builtin:
+            out = f"R{ch + 1}"
         is_control = cat in GATEWAY_CATEGORIES and ttype in CONTROL_TYPES
         dev_def = DEVICE_BY_TYPE.get(ttype, {})
 
@@ -263,6 +278,8 @@ def check_wiring(editor):
                 "DALI hattı" if cat == "dali" else "Enerji (230V)"
             ),
             "note": (
+                "Panelin dahili kuru kontak rölesi; yük akımını datasheet'ten kontrol edin"
+                if is_builtin else
                 "Gateway → iç ünite haberleşme; enerji ayrıca panodan"
                 if is_control else
                 f"Ayrı faz damarları ({pair}) + nötr + toprak"

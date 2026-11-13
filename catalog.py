@@ -148,6 +148,76 @@ ROOM_DEVICES = [
     {"id": "sensor", "type": "sensor", "label": "Sensör (genel)", "icon": "📡",
      "group": "Sensör", "kind": "bus", "ga": 4, "ma": 10,
      "objects": [("SENS", "DPST-1-1", "Sensör")]},
+
+    # --- Akubela (Modüler Otomasyon) ---
+    # Açıklamalar ürün listesinden alınmıştır. Dahili röle yük akımı, bus
+    # akımı ve panel beslemesi DATASHEET'ten doğrulanmalıdır.
+    {"id": "akb_elite10", "type": "akb_elite10", "brand": "Akubela", "sku": None,
+     "label": "Akubela Hypanel Elite 10\" PH59-KNX", "icon": "🖥",
+     "desc": "10\" KNX dokunmatik panel",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 0,
+     "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı")]},
+    {"id": "akb_keyplus", "type": "akb_keyplus", "brand": "Akubela", "sku": "153-02-321",
+     "label": "Akubela Hypanel KeyPlus KS03 KNX", "icon": "🎛",
+     "desc": "Ekranlı tuşlu KNX panel",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 0,
+     "objects": [("SCENE", "DPST-18-1", "Sahne"), ("PUSH1", "DPST-1-1", "Tuş 1"),
+                 ("PUSH2", "DPST-1-1", "Tuş 2"), ("PUSH3", "DPST-1-1", "Tuş 3")]},
+    {"id": "akb_ps51", "type": "akb_ps51", "brand": "Akubela", "sku": "153-02-124",
+     "label": "Akubela Hypanel KNX Kasası PS51-KS41", "icon": "🔲",
+     "desc": "Hypanel KNX kasası, ilave 2 kuru kontak röle",
+     "group": "Akubela", "kind": "bus", "ga": 1, "ma": 10, "relays": 2,
+     "objects": []},
+    {"id": "akb_lux", "type": "akb_lux", "brand": "Akubela", "sku": None,
+     "label": "Akubela Hypanel Lux RT61 KNX", "icon": "⏺",
+     "desc": "Android 10, döner yuvarlak 2.3\" ekran, 4 fiziksel buton, dahili 2 röle, dahili sıcaklık-nem sensörü",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
+     "objects": [("PUSH1", "DPST-1-1", "Tuş 1"), ("PUSH2", "DPST-1-1", "Tuş 2"),
+                 ("PUSH3", "DPST-1-1", "Tuş 3"), ("PUSH4", "DPST-1-1", "Tuş 4"),
+                 ("TEMP", "DPST-9-1", "Sıcaklık"), ("HUM", "DPST-9-7", "Nem")]},
+    {"id": "akb_pro", "type": "akb_pro", "brand": "Akubela", "sku": None,
+     "label": "Akubela Hypanel Pro KNX (8\", kameralı)", "icon": "📷",
+     "desc": "Kameralı 8\" KNX panel, 2 röle ilaveli",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
+     "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı")]},
+    {"id": "akb_supreme", "type": "akb_supreme", "brand": "Akubela", "sku": None,
+     "label": "Akubela Hypanel Supreme KNX (12.36\")", "icon": "🖥",
+     "desc": "12.36\" KNX, 2 çıkış, 1 kapı zili girişi, Zigbee, 2M kasa",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
+     "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı"),
+                 ("BELL", "DPST-1-1", "Kapı Zili")]},
+    {"id": "akb_ultra", "type": "akb_ultra", "brand": "Akubela", "sku": None,
+     "label": "Akubela Hypanel Ultra KNX (10\")", "icon": "🖥",
+     "desc": "10\" KNX, 2 çıkış, 1 kapı zili girişi, Zigbee, 2M kasa",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
+     "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı"),
+                 ("BELL", "DPST-1-1", "Kapı Zili")]},
+    {"id": "akb_k32b4_multi", "type": "akb_k32b4", "brand": "Akubela", "sku": "153-02-360",
+     "label": "Akubela Aura K32-B4 4 Tuş (çoklu kit)", "icon": "🔳",
+     "desc": "Aura serisi çoklu 4 buton KNX anahtar (support bracket dahil değil)",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 0,
+     "objects": [("PUSH1", "DPST-1-1", "Tuş 1"), ("PUSH2", "DPST-1-1", "Tuş 2"),
+                 ("PUSH3", "DPST-1-1", "Tuş 3"), ("PUSH4", "DPST-1-1", "Tuş 4")]},
+    {"id": "akb_k32b4_single", "type": "akb_k32b4", "brand": "Akubela", "sku": "153-02-359",
+     "label": "Akubela Aura K32-B4 4 Tuş (tekli)", "icon": "🔳",
+     "desc": "Aura serisi tekli 4 buton KNX anahtar (tekli support bracket dahil)",
+     "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 0,
+     "objects": [("PUSH1", "DPST-1-1", "Tuş 1"), ("PUSH2", "DPST-1-1", "Tuş 2"),
+                 ("PUSH3", "DPST-1-1", "Tuş 3"), ("PUSH4", "DPST-1-1", "Tuş 4")]},
+    {"id": "akb_k32m_multi", "type": "akb_k32m", "brand": "Akubela", "sku": "153-02-362",
+     "label": "Akubela Aura K32-M Termostat (çoklu kit)", "icon": "🌡",
+     "desc": "Aura serisi çoklu termostat paneli; HVAC mod / fan hızı / swing (support bracket dahil değil)",
+     "group": "Akubela", "kind": "bus", "ga": 3, "ma": 10, "relays": 0,
+     "objects": [("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı"), ("TEMP_ACT", "DPST-9-1", "Ortam Sıcaklığı"),
+                 ("HVAC_MODE", "DPST-20-105", "HVAC Mod"), ("FAN", "DPST-5-1", "Fan Hızı"),
+                 ("SWING", "DPST-1-1", "Swing")]},
+    {"id": "akb_k32m_single", "type": "akb_k32m", "brand": "Akubela", "sku": "153-02-361",
+     "label": "Akubela Aura K32-M Termostat (tekli)", "icon": "🌡",
+     "desc": "Aura serisi tekli termostat paneli; HVAC mod / fan hızı / swing (tekli support bracket dahil)",
+     "group": "Akubela", "kind": "bus", "ga": 3, "ma": 10, "relays": 0,
+     "objects": [("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı"), ("TEMP_ACT", "DPST-9-1", "Ortam Sıcaklığı"),
+                 ("HVAC_MODE", "DPST-20-105", "HVAC Mod"), ("FAN", "DPST-5-1", "Fan Hızı"),
+                 ("SWING", "DPST-1-1", "Swing")]},
 ]
 
 # --------------------------------
@@ -299,10 +369,27 @@ def device_objects(dev):
     if base["type"] == "switch":
         n = int(dev.get("buttons") or 1)
         return [(f"PUSH{i}", "DPST-1-1", f"Tuş {i}") for i in range(1, n + 1)]
+    if base.get("relays"):
+        objs = objs + [
+            (f"R{i}", "DPST-1-1", f"Dahili Röle {i} Aç/Kapa")
+            for i in range(1, int(base["relays"]) + 1)
+        ]
+        return objs
     if base["type"] == "universal_if":
         n = int(dev.get("inputs") or base.get("inputs") or 4)
         return [(f"IN{i}", "DPST-1-1", f"Giriş {i}") for i in range(1, n + 1)]
     return objs
+
+
+def device_relays(dev):
+    """Saha cihazının dahili röle (yük çıkışı) sayısı (Akubela paneller)."""
+    base = DEVICE_BY_TYPE.get(dev.get("type"), {})
+    return int(base.get("relays") or 0)
+
+
+def relay_prod_id(dev_id, k):
+    """Dahili röle kanalları için sahte ürün kimliği (kablo bağlantısında)."""
+    return f"dr_{dev_id}_{k}"
 
 
 def device_bus_ma(dev):
