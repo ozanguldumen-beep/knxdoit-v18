@@ -268,6 +268,8 @@ def check_wiring(editor):
             "floor": floor.get("name", ""),
             "from": f"{panel.get('name', 'Pano')} / "
                     f"{prod.get('name')} / {out}",
+            "panel_id": panel.get("id"), "prod_id": prod.get("id"),
+            "category": cat, "out": out, "builtin": is_builtin,
             "to": place,
             "load": load,
             "cable": (
@@ -310,6 +312,7 @@ def check_wiring(editor):
                         "kind": "energy",
                         "floor": f.get("name", ""),
                         "from": "Pano / Ayrı sigorta (doğrudan besleme)",
+                        "direct": True, "floor_id": f.get("id"),
                         "to": r.get("name", "Oda"),
                         "load": f"{label} {k + 1}",
                         "cable": dev_def.get("cable", CABLE_ENERGY),

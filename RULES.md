@@ -138,6 +138,16 @@ kapasitesine sayılır. Dim lamba bu rölelere bağlanamaz.
   Değerler: Pro 10 W, PS51 5 W (datasheet). Elite 10 → 10 W, KeyPlus 5 W, Lux 5 W, Supreme 15 W,
   Ultra 10 W **tahmini** (datasheet bulunamadı).
 
+## PDF: Kablo şeması ve tek hat şeması (v24 / v25)
+- **Kablo Şeması:** editörde çizilen plan her kat için görüntü olarak PDF'e girer; altında o katın
+  hata / uyarıları.
+- **Tek Hat Şeması (pano başına):** ana besleme → ana şalter → kaçak akım 30 mA → bara; baradan
+  her cihaz için sigorta → cihaz → kanal çıkışları (K1…, R1…, 24V, BUS) → oda / yük / kablo.
+  Boş kanallar "yedek" olarak yazılır. Doğrudan beslenen klima / VRF ve oda panellerinin dahili
+  röleleri (maks. 1 A) ilk panoya ayrı hat olarak çizilir.
+- Önerilen sigortalar: KNX PS / 24V PS / gateway / ısıtma C6, röle C16, dimmer B10, perde / fancoil
+  / RGBW C10, klima C16. **Öneridir**; elektrikçi belirler.
+
 ## Henüz yok (sonraki sürümler)
 - Otomatik kanal ataması ("Otomatik bağla") — şimdilik kablolar elle çekiliyor
 - Kombi, kapı otomasyonu; Akuvox / Akubela entegrasyonu (ürün bilgisi bekleniyor)

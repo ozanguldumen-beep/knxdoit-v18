@@ -242,6 +242,7 @@ def make_pdf(data):
     )
 
     diagrams = (data or {}).pop("diagrams", None) or []
+    editor_data = (data or {}).get("editor") or {}
     data, res = analyze(data)
     summary = res["summary"]
     pname = escape(data.get("project_name", "KNXdoit Projesi"))
@@ -374,6 +375,14 @@ def make_pdf(data):
             story += issue_block(f_issues, f"{escape(fname)} — Hatalar ve uyarılar")
         except Exception:
             app.logger.exception("Kablo şeması PDF'e eklenemedi")
+
+    # ---------- Sayfa: Tek hat şeması (pano başına) ----------
+    if editor_data.get("floors"):
+        try:
+            from single_line import single_line_story
+            story += single_line_story(editor_data, res, h2, normal)
+        except Exception:
+            app.logger.exception("Tek hat şeması PDF'e eklenemedi")
 
     # ---------- Sayfa 2: Fiziksel adresler ----------
     story += [PageBreak(), Paragraph("Fiziksel Adresler", h2)]
