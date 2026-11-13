@@ -1210,8 +1210,121 @@ $("saveBtn").onclick = async () => {
   toast("Proje kaydedildi.");
 };
 
-$("pdfBtn").onclick = () => downloadFile("/api/pdf", payload(),
-  `${payload().project_name}_elektrikci.pdf`).catch(() => toast("PDF oluşturulamadı.", "error"));
+// --------------------------------
+// KABLO ŞEMASI GÖRÜNTÜSÜ (PDF için): planı DOM + kablo canvas'ından PNG'ye çiz
+// --------------------------------
+
+function snapshotFloor(scale = 2) {
+  const skip = el => el.closest(".addbtn");
+  const els = [...cv.querySelectorAll("*")].filter(el => el.offsetParent !== null && !skip(el));
+  if (!els.length) return null;
+  const s = stage.getBoundingClientRect();
+  const rel = r => ({ x: (r.left - s.left) / zoom, y: (r.top - s.top) / zoom, w: r.width / zoom, h: r.height / zoom });
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const boxes = els.map(el => {
+    const b = rel(el.getBoundingClientRect());
+    if (b.w && b.h) { x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
+    return { el, b };
+  });
+  // kablolar kutuların dışına taşabilir
+  for (const g of wireGeom) for (const q of [g.a, g.b]) {
+    x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y);
+  }
+  const pad = 24;
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad);
+  x1 = Math.min(wc.width, x1 + pad); y1 = Math.min(wc.height, y1 + pad);
+  const W = Math.ceil(x1 - x0), H = Math.ceil(y1 - y0);
+  if (W <= 0 || H <= 0) return null;
+  const out = document.createElement("canvas");
+  out.width = W * scale; out.height = H * scale;
+  const c = out.getContext("2d");
+  c.scale(scale, scale);
+  c.fillStyle = "#fff"; c.fillRect(0, 0, W, H);
+  const rr = (x, y, w, h, r) => {
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  };
+  // 1) kutular (arka plan + çerçeve), DOM sırasıyla
+  for (const { el, b } of boxes) {
+    if (!b.w || !b.h) continue;
+    const cs = getComputedStyle(el);
+    const bg = cs.backgroundColor, bw = parseFloat(cs.borderTopWidth) || 0;
+    const rad = parseFloat(cs.borderTopLeftRadius) || 0;
+    const x = b.x - x0, y = b.y - y0;
+    if (bg && bg !== "transparent" && !/rgba\(.*,\s*0\)$/.test(bg)) { rr(x, y, b.w, b.h, rad); c.fillStyle = bg; c.fill(); }
+    if (bw > 0 && cs.borderTopStyle !== "none") {
+      rr(x + bw / 2, y + bw / 2, b.w - bw, b.h - bw, rad); c.lineWidth = bw;
+      c.setLineDash(cs.borderTopStyle === "dashed" ? [5, 3] : []); c.strokeStyle = cs.borderTopColor; c.stroke(); c.setLineDash([]);
+    }
+  }
+  // 2) yazılar
+  const walker = document.createTreeWalker(cv, NodeFilter.SHOW_TEXT);
+  const range = document.createRange();
+  c.textBaseline = "middle";
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const txt = n.textContent.replace(/\s+/g, " ").trim();
+    if (!txt || !n.parentElement || n.parentElement.offsetParent === null || skip(n.parentElement)) continue;
+    const cs = getComputedStyle(n.parentElement);
+    c.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    c.fillStyle = cs.color;
+    range.selectNodeContents(n);
+    const rects = [...range.getClientRects()];
+    if (rects.length <= 1) {
+      const b = rel(range.getBoundingClientRect());
+      c.textAlign = "left";
+      c.save(); c.beginPath(); c.rect(b.x - x0 - 1, b.y - y0 - 1, b.w + 2, b.h + 2);
+      c.fillText(txt, b.x - x0, b.y - y0 + b.h / 2, b.w + 4); c.restore();
+    } else {
+      // satır kaydıran yazı: kelimeleri satırlara dağıt
+      const words = txt.split(" "); let wi = 0;
+      for (const r of rects) {
+        const b = rel(r); let line = "";
+        while (wi < words.length && c.measureText((line ? line + " " : "") + words[wi]).width <= b.w + 2) line += (line ? " " : "") + words[wi++];
+        if (!line && wi < words.length) line = words[wi++];
+        c.fillText(line, b.x - x0, b.y - y0 + b.h / 2);
+      }
+    }
+  }
+  // 3) kablolar (mevcut canvas)
+  c.drawImage(wc, x0, y0, W, H, 0, 0, W, H);
+  return { png: out.toDataURL("image/png"), w: W, h: H };
+}
+
+async function captureDiagrams() {
+  const keep = { cur, pick, view, selRoom, selPanel };
+  pick = null; selRoom = null; selPanel = null;
+  const wasDin = view === "din";
+  if (wasDin) { $("planView").classList.remove("hidden"); $("dinView").classList.add("hidden"); view = "plan"; }
+  const shots = [];
+  try {
+    for (let i = 0; i < state.floors.length; i++) {
+      cur = i; render();
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const shot = snapshotFloor();
+      const fl = state.floors[i];
+      if (shot) shots.push({
+        floor: fl.name, ...shot,
+        names: [...fl.rooms, ...fl.panels, ...fl.collectors].map(o => o.name).filter(Boolean)
+      });
+    }
+  } finally {
+    ({ cur, pick, view, selRoom, selPanel } = keep);
+    if (wasDin) { $("planView").classList.add("hidden"); $("dinView").classList.remove("hidden"); }
+    render();
+  }
+  return shots;
+}
+
+$("pdfBtn").onclick = async () => {
+  toast("PDF hazırlanıyor (kablo şeması çiziliyor)…");
+  let diagrams = [];
+  try { diagrams = await captureDiagrams(); } catch (e) { console.warn("şema alınamadı", e); }
+  const body = { ...payload(), diagrams };
+  downloadFile("/api/pdf", body, `${body.project_name}_elektrikci.pdf`)
+    .then(() => toast("PDF indirildi."))
+    .catch(() => toast("PDF oluşturulamadı.", "error"));
+};
 $("knxBtn").onclick = () => downloadFile("/api/generate", payload(),
   `${payload().project_name}.knxproj`).catch(() => toast(".knxproj oluşturulamadı.", "error"));
 

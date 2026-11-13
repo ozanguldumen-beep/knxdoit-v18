@@ -11,6 +11,7 @@ from werkzeug.security import (
     generate_password_hash, check_password_hash
 )
 from datetime import datetime, timedelta
+import base64
 from io import BytesIO
 from xml.sax.saxutils import escape
 import os
@@ -215,7 +216,7 @@ def make_pdf(data):
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.platypus import (
         SimpleDocTemplate, Table, TableStyle,
-        Paragraph, Spacer, PageBreak
+        Paragraph, Spacer, PageBreak, Image, KeepTogether
     )
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
@@ -240,6 +241,7 @@ def make_pdf(data):
         "n", parent=ss["Normal"], fontName="DejaVu", fontSize=9
     )
 
+    diagrams = (data or {}).pop("diagrams", None) or []
     data, res = analyze(data)
     summary = res["summary"]
     pname = escape(data.get("project_name", "KNXdoit Projesi"))
@@ -267,7 +269,7 @@ def make_pdf(data):
     }[summary["status"]]
 
     story = [
-        Paragraph("KNXdoit v19 - KNX Sistem Özeti", title),
+        Paragraph("KNXdoit v23 - KNX Sistem Özeti", title),
         Paragraph(f"Proje: {pname} | ETS: {ets}", normal),
         Spacer(1, 8),
         Paragraph(
@@ -292,8 +294,12 @@ def make_pdf(data):
             f"{ln['recommended_psu']} mA"
             if ln["recommended_psu"] else "Hattı böl",
             Paragraph(escape(" · ".join(
-                f"{CATEGORY_LABEL.get(c, c)} {n}/{h}"
-                for c, (n, h) in (ln.get("channels") or {}).items()
+                [f"{CATEGORY_LABEL.get(c, c)} {n}/{h}"
+                 for c, (n, h) in (ln.get("channels") or {}).items()]
+                + ([f"24V: {ln.get('supply24')} ekran"
+                    + (f", {ln['w24']} W (+%30 = {ln['w24_required']} W) / kurulu {ln['w24_installed']} W"
+                       if ln.get("w24") else " (PoE / kaynak yok)")]
+                   if ln.get("supply24") else [])
             ) or "—"), normal),
         ])
     story.append(table(rows, [40, 85, 55, 60, 65, 60, 65, 300]))
@@ -323,6 +329,52 @@ def make_pdf(data):
     else:
         story.append(Paragraph("Tüm kontroller uygun.", normal))
 
+    def issue_block(issues, heading):
+        if not issues:
+            return [Paragraph(f"<b>{heading}:</b> uygun, hata / uyarı yok.", normal)]
+        rows = [["Durum", "Açıklama"]]
+        extra = []
+        for i, iss in enumerate(issues, start=1):
+            is_err = iss["level"] == "error"
+            rows.append(["HATA" if is_err else "UYARI", Paragraph(escape(iss["message"]), normal)])
+            extra.append(("TEXTCOLOR", (0, i), (0, i),
+                          colors.HexColor("#B91C1C" if is_err else "#B45309")))
+        return [Paragraph(f"<b>{heading}</b>", normal), Spacer(1, 3),
+                table(rows, [50, 736], "#7C2D12", extra=extra)]
+
+    # ---------- Sayfa: Kablo Şeması (editörde çizilen plan) ----------
+    for dg in diagrams[:12]:
+        try:
+            raw = str(dg.get("png", ""))
+            if not raw.startswith("data:image/png;base64,") or len(raw) > 12_000_000:
+                continue
+            img_bytes = base64.b64decode(raw.split(",", 1)[1])
+            fname = str(dg.get("floor", ""))
+            w, h = float(dg.get("w") or 1), float(dg.get("h") or 1)
+            # bu katın adı, odaları veya panoları geçen hata/uyarılar
+            keys = [k for k in [fname, *(dg.get("names") or [])] if k]
+            if len(diagrams) <= 1:
+                f_issues = res["issues"]
+            else:
+                f_issues = [i for i in res["issues"] if any(k in i["message"] for k in keys)]
+            # şema + uyarılar aynı sayfaya sığsın
+            rows_h = sum(14 + 11 * (len(i["message"]) // 150) for i in f_issues) + 34 if f_issues else 16
+            max_w, max_h = 786, max(200, 455 - rows_h)
+            k = min(max_w / w, max_h / h)
+            img = Image(BytesIO(img_bytes), width=w * k, height=h * k)
+            story += [
+                PageBreak(),
+                Paragraph(f"Kablo Şeması — {escape(fname)}", h2),
+                Paragraph(
+                    '<font color="#8B4513"><b>━━</b></font> Enerji (230V) &nbsp;&nbsp; '
+                    '<font color="#16a34a"><b>━━</b></font> KNX bus &nbsp;&nbsp; '
+                    '<font color="#0284c7"><b>╍╍</b></font> Gateway kontrol hattı', normal),
+                Spacer(1, 4), img, Spacer(1, 6),
+            ]
+            story += issue_block(f_issues, f"{escape(fname)} — Hatalar ve uyarılar")
+        except Exception:
+            app.logger.exception("Kablo şeması PDF'e eklenemedi")
+
     # ---------- Sayfa 2: Fiziksel adresler ----------
     story += [PageBreak(), Paragraph("Fiziksel Adresler", h2)]
     rows = [["Adres", "Kat / Hat", "Konum", "Cihaz", "Bus akımı"]]
@@ -336,17 +388,37 @@ def make_pdf(data):
     # ---------- Sayfa: Kablo Çekim Listesi ----------
     if res.get("cables"):
         story += [PageBreak(), Paragraph("Kablo Çekim Listesi", h2)]
+        notes = []
+        if any("dahili röle" in (c.get("from") or "") for c in res["cables"]):
+            notes.append("Panel dahili röleleri maks. 1 A — LED / sürücülü yükte ani akım nedeniyle daha düşük yük bağlayın.")
+        if any(c.get("line") == "24V DC besleme" for c in res["cables"]):
+            notes.append("24V DC besleme hatları 2×1.5 çekilmeli; uzun hatlarda gerilim düşümünü kontrol edin, KNX bus kablosu ile karıştırmayın.")
+        if any(c.get("line") == "PoE besleme + data" for c in res["cables"]):
+            notes.append("PoE ile beslenen paneller için switch portu PoE (802.3af/at) olmalı; Cat6 çekin.")
+        if res["issues"]:
+            notes.append(f"Projede {summary['errors']} hata, {summary['warnings']} uyarı var — "
+                         "ayrıntı aşağıda; hatalar giderilmeden uygulamaya geçmeyin.")
+        if notes:
+            story.append(Paragraph("<b>⚠ Dikkat</b><br/>" + "<br/>".join("• " + escape(n) for n in notes), normal))
+            story.append(Spacer(1, 6))
+        if res["issues"]:
+            story += issue_block(res["issues"], "Hatalar ve uyarılar")
+            story.append(Spacer(1, 8))
         rows = [[
             "Kat", "Pano çıkışı", "Gittiği yer", "Yük",
-            "Kablo", "Hat türü"
+            "Kablo", "Hat türü", "Not"
         ]]
+        small = ParagraphStyle("sm", parent=normal, fontSize=7.5, leading=9)
         extra = []
         for i, c in enumerate(res["cables"], start=1):
             rows.append([
                 c["floor"],
                 Paragraph(escape(c["from"]), normal),
                 Paragraph(escape(c["to"]), normal),
-                c["load"], c["cable"], c["line"]
+                Paragraph(escape(c["load"]), normal),
+                Paragraph(escape(c["cable"]), normal),
+                c["line"],
+                Paragraph(escape(c.get("note") or ""), small),
             ])
             extra.append((
                 "TEXTCOLOR", (5, i), (5, i),
@@ -355,7 +427,7 @@ def make_pdf(data):
                 )
             ))
         story.append(table(
-            rows, [70, 220, 160, 100, 100, 85], "#8B4513", extra
+            rows, [55, 170, 110, 115, 80, 85, 171], "#8B4513", extra
         ))
         story.append(Spacer(1, 6))
         story.append(Paragraph(
