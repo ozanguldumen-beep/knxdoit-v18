@@ -46,6 +46,7 @@ ROOM_BUS_MA = {
 ACTUATOR_FOR = {
     "light": "relay",
     "valve": "relay",
+    "onoff": "relay",
     "dim": "dimmer",
     "curtain": "curtain_actuator",
 }
@@ -63,6 +64,7 @@ GA_MAIN = {
     "curtain": (2, "Perde / Jalüzi"),
     "thermostat": (3, "Isıtma / HVAC"),
     "valve": (3, "Isıtma / HVAC"),
+    "onoff": (5, "Genel Yükler"),
     "switch": (4, "Tuş / Sensör"),
     "sensor": (4, "Tuş / Sensör"),
 }
@@ -100,7 +102,16 @@ DPT = {
     "valve": [
         ("VALVE", "DPST-1-1", "Vana Aç/Kapa"),
     ],
+    "onoff": [
+        ("SW", "DPST-1-1", "Aç/Kapa"),
+        ("SW_FB", "DPST-1-1", "Aç/Kapa D.B."),
+    ],
 }
+
+# 230V yükler (aktüatör kanalına bağlanır) ve KNX bus cihazları
+ENERGY_TYPES = {"light", "dim", "curtain", "valve", "onoff"}
+BUS_TYPES = {"switch", "thermostat", "sensor"}
+LOAD_OUTPUT_CATEGORIES = {"relay", "dimmer", "curtain_actuator"}
 
 
 # --------------------------------
@@ -375,7 +386,11 @@ def check_floor(floor, line_no):
 
     # --- Aktuator kanallari ---
     relay_have = _channels(floor, "relay")
-    relay_need = _needed(floor, "light") + _needed(floor, "valve")
+    relay_need = (
+        _needed(floor, "light")
+        + _needed(floor, "valve")
+        + _needed(floor, "onoff")
+    )
     dim_have = _channels(floor, "dimmer")
     dim_need = _needed(floor, "dim")
     blind_have = _channels(floor, "curtain_actuator")
@@ -401,7 +416,7 @@ def check_floor(floor, line_no):
     if relay_spare < 0:
         issues.append(_issue(
             "error", "RELAY_CHANNELS",
-            f"{name}: Lamba + vana için {relay_need} röle kanalı "
+            f"{name}: Lamba + vana + on/off için {relay_need} röle kanalı "
             f"gerekli, {relay_have} var. {-relay_spare} kanal eksik."
         ))
 

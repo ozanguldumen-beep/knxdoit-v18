@@ -13,13 +13,13 @@
 
   {% if projects %}
     {% for p in projects %}
-      <div class="project-row">
+      <a class="project-row" href="/project/{{ p.id }}">
         <b>{{ p.name }}</b>
         <span>
           {{ p.ets_version }} ·
-          {{ p.created_at.strftime('%d.%m.%Y') }}
+          {{ p.created_at.strftime('%d.%m.%Y') }} · Aç →
         </span>
-      </div>
+      </a>
     {% endfor %}
   {% else %}
     <div class="empty">

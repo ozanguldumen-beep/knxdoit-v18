@@ -1,6 +1,6 @@
-# KNXdoit v18 — Kural Listesi
+# KNXdoit v19 — Kural Listesi
 
-Kodda karşılığı: `knx_rules.py`. Ekran, PDF ve `.knxproj` aynı hesaptan beslenir.
+Kodda karşılığı: `knx_rules.py` (proje kuralları) ve `knx_wiring.py` (elle çekilen kablolar). Ekran, PDF ve `.knxproj` aynı hesaptan beslenir.
 Durum: 🔴 Hata (proje uygulanmamalı) · 🟠 Uyarı (kontrol edilmeli) · 🟢 Uygun
 
 ## Varsayımlar
@@ -67,8 +67,27 @@ Orta grup = kat (0–7), alt grup = sıra (1–255).
 
 DPT: Aç/Kapa 1.001 · Rölatif dim 3.007 · Değer 5.001 · Perde Yukarı/Aşağı 1.008 · Perde Adım/Dur **1.007** · Sıcaklık 9.001 · HVAC mod 20.102
 
+## Elle çekilen kablolar (v19 editör)
+Editör yanlış bağlantıya izin vermez (anında engeller); sunucu aynı kontrolü kaydedilen projede tekrar yapar.
+
+| Kod | Kural | Seviye |
+|---|---|---|
+| WRONG_ACTUATOR | Lamba / vana / on-off → Switch Aktüatör; dim lamba → Dimmer (röleye bağlanırsa dim çalışmaz); perde → Jalüzi Aktüatörü | 🔴 |
+| CURTAIN_ON_RELAY | Perde röleye ancak yan yana 2 boş kanalla (Yukarı + Aşağı) bağlanır; ETS'de kilitleme ayarlanmalı | 🟠 |
+| NOT_A_LOAD | KNX cihazı (anahtar, termostat, sensör) aktüatör kanalına bağlanmaz | 🔴 |
+| CHANNEL_DOUBLE | Bir kanala tek yük | 🔴 |
+| LOAD_DOUBLE | Bir yük tek kanaldan beslenir | 🔴 |
+| LOAD_UNCONNECTED | Kanala bağlanmamış yük var | 🟠 |
+| BUS_INVALID | 230V yüke ve kollektör dolabına KNX bus bağlanmaz | 🔴 |
+| BUS_RING | Bus kablosu ring oluşturamaz | 🔴 |
+| BUS_UNCONNECTED | Bus ile panoya ulaşmayan KNX cihazı var | 🟠 |
+
+Kablo Çekim Listesi (PDF): her enerji kablosu için pano/ürün/kanal → oda → yük → kesit;
+her bus kablosu için düğümden düğüme. Kesitler ÖRNEKTİR (aydınlatma 3×1.5, perde 4×1.5,
+bus 2×2×0.8 J-Y(St)Y); kesit ve sigortayı elektrikçi belirler.
+
 ## Henüz yok (sonraki sürümler)
-- Kahverengi enerji kablolarının çizimi, kanal numarası ataması
+- Otomatik kanal ataması ("Otomatik bağla") — şimdilik kablolar elle çekiliyor
 - Klima/kombi (panodan doğrudan besleme) cihaz tipi, RGBW, çok tuşlu anahtar seçenekleri
 - Kablo mesafesi kontrolü
 - `.knxproj` gerçek ETS'de **doğrulanmadı**

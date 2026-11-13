@@ -170,7 +170,8 @@ def load_user(user_id):
 # KNX KURAL MOTORU (knx_rules.py)
 # --------------------------------
 
-from knx_rules import check_project, build_gas  # noqa: E402
+from knx_rules import build_gas  # noqa: E402
+from knx_wiring import analyze  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -232,7 +233,7 @@ def make_pdf(data):
         "n", parent=ss["Normal"], fontName="DejaVu", fontSize=9
     )
 
-    res = check_project(data)
+    data, res = analyze(data)
     summary = res["summary"]
     pname = escape(data.get("project_name", "KNXdoit Projesi"))
     ets = escape(data.get("ets_version", "ETS6"))
@@ -259,7 +260,7 @@ def make_pdf(data):
     }[summary["status"]]
 
     story = [
-        Paragraph("KNXdoit v18 - KNX Sistem Özeti", title),
+        Paragraph("KNXdoit v19 - KNX Sistem Özeti", title),
         Paragraph(f"Proje: {pname} | ETS: {ets}", normal),
         Spacer(1, 8),
         Paragraph(
@@ -324,6 +325,38 @@ def make_pdf(data):
         ])
     story.append(table(rows, [70, 120, 120, 300, 80], "#0F766E"))
 
+    # ---------- Sayfa: Kablo Çekim Listesi ----------
+    if res.get("cables"):
+        story += [PageBreak(), Paragraph("Kablo Çekim Listesi", h2)]
+        rows = [[
+            "Kat", "Pano çıkışı", "Gittiği yer", "Yük",
+            "Kablo", "Hat türü"
+        ]]
+        extra = []
+        for i, c in enumerate(res["cables"], start=1):
+            rows.append([
+                c["floor"],
+                Paragraph(escape(c["from"]), normal),
+                Paragraph(escape(c["to"]), normal),
+                c["load"], c["cable"], c["line"]
+            ])
+            extra.append((
+                "TEXTCOLOR", (5, i), (5, i),
+                colors.HexColor(
+                    "#15803D" if c["kind"] == "bus" else "#8B4513"
+                )
+            ))
+        story.append(table(
+            rows, [70, 220, 160, 100, 100, 85], "#8B4513", extra
+        ))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(
+            "Kablo kesitleri örnektir; kesit ve sigortayı devrenin "
+            "yüküne ve yönetmeliğe göre elektrikçi belirler. KNX bus "
+            "kablosu 230V hatlarından ayrı güzergâhtan çekilir, ring "
+            "yapılmaz.", normal
+        ))
+
     # ---------- Sayfa 3: Grup adresleri ----------
     story += [PageBreak(), Paragraph("Grup Adresleri", h2)]
     rows = [[
@@ -356,6 +389,7 @@ def attr(value):
 
 def make_knxproj(data):
     """ETS uyumluluğu henüz gerçek ETS'de DOĞRULANMADI."""
+    data, _ = analyze(data)
     gas, _ = build_gas(data)
     floors = data.get("floors", []) or []
 
@@ -420,7 +454,7 @@ def make_knxproj(data):
         )
 
     xml = f"""<?xml version="1.0" encoding="utf-8"?>
-<KNX xmlns="http://knx.org/xml/project/21" CreatedBy="KNXdoit" ToolVersion="v18">
+<KNX xmlns="http://knx.org/xml/project/21" CreatedBy="KNXdoit" ToolVersion="v19">
   <Project Id="{pid}">
     <Installations>
       <Installation Name="{attr(project_name)}" GroupAddressStyle="ThreeLevel">
@@ -446,7 +480,7 @@ def make_knxproj(data):
             f"{pid}/project.xml",
             f'<?xml version="1.0" encoding="utf-8"?>\n'
             f'<KNX xmlns="http://knx.org/xml/project/21" '
-            f'CreatedBy="KNXdoit" ToolVersion="v18">\n'
+            f'CreatedBy="KNXdoit" ToolVersion="v19">\n'
             f'  <Project Id="{pid}">\n'
             f'    <ProjectInformation Name="{attr(project_name)}"/>\n'
             f'  </Project>\n</KNX>'
@@ -500,13 +534,39 @@ def new_project():
         )
 
     return render_template(
-        "project.html"
+        "project.html",
+        project_id=None,
+        saved=None
+    )
+
+
+@app.route("/project/<int:project_id>")
+@login_required
+def open_project(project_id):
+    p = Project.query.filter_by(
+        id=project_id, user_id=current_user.id
+    ).first_or_404()
+
+    try:
+        saved = json.loads(p.data or "{}")
+    except ValueError:
+        saved = {}
+
+    return render_template(
+        "project.html",
+        project_id=p.id,
+        saved=saved
     )
 
 
 # --------------------------------
 # API
 # --------------------------------
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
 
 @app.route("/healthz")
 def healthz():
@@ -526,20 +586,32 @@ def healthz():
 @login_required
 def save_project():
     d = request.get_json(silent=True) or {}
+    project_id = d.pop("project_id", None)
 
-    p = Project(
-        user_id=current_user.id,
-        name=d.get("project_name")
-        or "KNXdoit Projesi",
-        ets_version=d.get("ets_version")
-        or "ETS6",
-        data=json.dumps(
-            d,
-            ensure_ascii=False
+    name = (d.get("project_name") or "KNXdoit Projesi")[:200]
+    ets = (d.get("ets_version") or "ETS6")[:10]
+    payload = json.dumps(d, ensure_ascii=False)
+
+    if project_id:
+        # Var olan projeyi güncelle (yalnızca sahibi)
+        p = Project.query.filter_by(
+            id=int(project_id), user_id=current_user.id
+        ).first()
+        if not p:
+            return jsonify({"ok": False, "error": "Proje bulunamadı"}), 404
+        p.name, p.ets_version, p.data = name, ets, payload
+    else:
+        if not current_user.can_create_project():
+            return jsonify({
+                "ok": False,
+                "error": "Trial süreniz doldu veya proje limitine ulaştınız."
+            }), 403
+        p = Project(
+            user_id=current_user.id,
+            name=name, ets_version=ets, data=payload
         )
-    )
+        db.session.add(p)
 
-    db.session.add(p)
     db.session.commit()
 
     return jsonify({
@@ -551,7 +623,7 @@ def save_project():
 @app.route("/api/preview", methods=["POST"])
 @login_required
 def preview():
-    res = check_project(
+    _, res = analyze(
         request.get_json(silent=True) or {}
     )
 
@@ -565,9 +637,8 @@ def preview():
 @app.route("/api/check", methods=["POST"])
 @login_required
 def check():
-    return jsonify(check_project(
-        request.get_json(silent=True) or {}
-    ))
+    _, res = analyze(request.get_json(silent=True) or {})
+    return jsonify(res)
 
 
 @app.route("/api/pdf", methods=["POST"])

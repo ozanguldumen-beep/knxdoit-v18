@@ -1,14 +1,32 @@
 // energy:true  -> 230V yük (aktüatör kanalına bağlanır, bus cihazı değil)
 // energy:false -> KNX bus cihazı (yeşil kablo)
 export const ROOM_DEVICES = [
-  { id:"light", label:"Lamba Yükü", type:"light", energy:true, icon:"L" },
-  { id:"dim", label:"Dim Lamba", type:"dim", energy:true, icon:"D" },
-  { id:"curtain", label:"Perde Motoru", type:"curtain", energy:true, icon:"M" },
-  { id:"valve", label:"Vana", type:"valve", energy:true, icon:"V" },
-  { id:"thermostat", label:"Termostat", type:"thermostat", energy:false, icon:"T" },
-  { id:"switch", label:"KNX Anahtar", type:"switch", energy:false, icon:"K" },
-  { id:"sensor", label:"Sensör", type:"sensor", energy:false, icon:"S" }
+  { id:"light", label:"Lamba", type:"light", energy:true, icon:"💡" },
+  { id:"dim", label:"Dim Lamba", type:"dim", energy:true, icon:"🔆" },
+  { id:"curtain", label:"Perde Motoru", type:"curtain", energy:true, icon:"🪟" },
+  { id:"valve", label:"Vana", type:"valve", energy:true, icon:"🔧" },
+  { id:"onoff", label:"On/Off Yük", type:"onoff", energy:true, icon:"⏻" },
+  { id:"thermostat", label:"Termostat", type:"thermostat", energy:false, icon:"🌡" },
+  { id:"switch", label:"KNX Anahtar", type:"switch", energy:false, icon:"🔘" },
+  { id:"sensor", label:"Sensör", type:"sensor", energy:false, icon:"📡" }
 ];
+
+// Hangi yük hangi aktüatör kanalına bağlanır (sunucudaki ACTUATOR_FOR ile aynı)
+export const ACTUATOR_FOR = {
+  light: "relay", valve: "relay", onoff: "relay",
+  dim: "dimmer", curtain: "curtain_actuator"
+};
+
+export const CATEGORY_LABEL = {
+  relay: "Switch Aktüatör",
+  dimmer: "Dimmer Aktüatör",
+  curtain_actuator: "Jalüzi/Perde Aktüatörü",
+  power_supply: "Power Supply",
+  interface: "IP Interface",
+  router: "IP Router",
+  line_coupler: "Line Coupler",
+  input: "Binary Input"
+};
 
 // busMa: varsayılan bus akımı (mA) - datasheet ile doğrulanmalı
 // psuMa: power supply çıkış akımı (mA)
