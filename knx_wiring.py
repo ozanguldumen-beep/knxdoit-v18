@@ -15,24 +15,19 @@ Editörün kaydettiği yapı (state):
 Kablo kesitleri ÖRNEKTİR; kesit ve sigortayı elektrikçi belirler.
 """
 
-from knx_rules import (
-    ACTUATOR_FOR, BUS_TYPES, ENERGY_TYPES, CATEGORY_LABEL, _issue, _int
+from knx_rules import _issue, _int
+from catalog import (
+    COMPAT, COMPAT_NOTE, CATEGORY_LABEL, DEVICE_BY_TYPE,
+    LOAD_TYPES as ENERGY_TYPES, BUS_TYPES, CONTROL_TYPES,
+    GATEWAY_CATEGORIES,
 )
 
 CABLE_ENERGY = "3×1.5"
 CABLE_CURTAIN = "4×1.5"
 CABLE_BUS = "2×2×0.8 J-Y(St)Y"
 
-TYPE_LABEL = {
-    "light": "Lamba",
-    "dim": "Dim Lamba",
-    "curtain": "Perde Motoru",
-    "valve": "Vana",
-    "onoff": "On/Off Yük",
-    "thermostat": "Termostat",
-    "switch": "KNX Anahtar",
-    "sensor": "Sensör",
-}
+TYPE_LABEL = {t: d["label"] for t, d in DEVICE_BY_TYPE.items()}
+TYPE_LABEL["switch"] = "Tuş Paneli"
 
 
 # --------------------------------
@@ -57,6 +52,8 @@ def editor_to_rules_data(editor, project_name, ets_version):
                             d.get("type"), "Cihaz"
                         ),
                         "count": max(1, _int(d.get("count", 1), 1)),
+                        "buttons": d.get("buttons"),
+                        "inputs": d.get("inputs"),
                     }
                     for d in r.get("devices", []) or []
                 ],
@@ -69,7 +66,8 @@ def editor_to_rules_data(editor, project_name, ets_version):
                 rooms.append({
                     "name": c.get("name", "Kollektör"),
                     "devices": [{
-                        "type": "valve", "label": "Vana", "count": valves
+                        "type": "valve", "label": "Termoelektrik Vana",
+                        "count": valves
                     }],
                 })
 
@@ -171,6 +169,7 @@ def check_wiring(editor):
 
     used_channels = {}
     used_targets = {}
+    alt_used = {}   # tip -> {"warn", "loads"}: alternatif kanala bağlananlar
 
     # ---------- Enerji kabloları ----------
     for link in editor.get("links", []) or []:
@@ -193,32 +192,27 @@ def check_wiring(editor):
             ))
             continue
 
-        need = ACTUATOR_FOR.get(ttype)
+        opts = COMPAT.get(ttype, [])
+        match = next(
+            (o for o in opts if o[0] == cat and o[1] == span), None
+        )
         if ttype not in ENERGY_TYPES:
             issues.append(_issue(
                 "error", "NOT_A_LOAD",
                 f"{place} / {load}: KNX cihazıdır, aktüatör kanalına "
                 f"bağlanmaz; KNX bus ile bağlanır."
             ))
-        elif cat == need and span == 1:
-            pass
-        elif ttype == "curtain" and cat == "relay" and span == 2:
-            issues.append(_issue(
-                "warn", "CURTAIN_ON_RELAY",
-                f"{place} / {load}: röle kanalı {ch + 1}-{ch + 2} ile "
-                f"bağlandı. ETS'de UP/DOWN kilitlemesi ayarlanmalı."
-            ))
-        else:
-            want = CATEGORY_LABEL.get(need, need)
-            extra = (
-                " Dim lamba röleye bağlanırsa dim çalışmaz."
-                if ttype == "dim" else ""
-            )
+        elif match is None:
+            want = CATEGORY_LABEL.get(opts[0][0], opts[0][0]) if opts else "?"
+            extra = COMPAT_NOTE.get(ttype, "")
             issues.append(_issue(
                 "error", "WRONG_ACTUATOR",
                 f"{place} / {load}: {prod.get('name')} ürününe "
-                f"bağlanmış; {want} kanalına bağlanmalı.{extra}"
+                f"bağlanmış; {want} kanalına bağlanmalı. {extra}".strip()
             ))
+        elif match[2]:
+            alt_used.setdefault(ttype, {"warn": match[2], "loads": []})
+            alt_used[ttype]["loads"].append(f"{place} / {load}")
 
         for c in range(ch, ch + span):
             key = (prod.get("id"), c)
@@ -238,12 +232,16 @@ def check_wiring(editor):
             ))
         used_targets[tkey] = True
 
+        two_way = ttype in ("curtain", "valve_motor")
+        pair = "Yukarı/Aşağı" if ttype == "curtain" else "Aç/Kapa"
         if span == 2:
-            out = f"K{ch + 1}+K{ch + 2} (Yukarı/Aşağı)"
-        elif ttype == "curtain":
-            out = f"K{ch + 1} (Yukarı/Aşağı)"
+            out = f"K{ch + 1}+K{ch + 2} ({pair})"
+        elif two_way:
+            out = f"K{ch + 1} ({pair})"
         else:
             out = f"K{ch + 1}"
+        is_control = cat in GATEWAY_CATEGORIES and ttype in CONTROL_TYPES
+        dev_def = DEVICE_BY_TYPE.get(ttype, {})
 
         floor = idx["floor"].get(link.get("floor"), {})
         cables.append({
@@ -257,14 +255,50 @@ def check_wiring(editor):
                     f"{prod.get('name')} / {out}",
             "to": place,
             "load": load,
-            "cable": CABLE_CURTAIN if ttype == "curtain" else CABLE_ENERGY,
-            "line": "Enerji (230V)",
+            "cable": (
+                "Üretici haberleşme kablosu" if is_control
+                else dev_def.get("cable", CABLE_ENERGY)
+            ),
+            "line": "Kontrol (gateway)" if is_control else (
+                "DALI hattı" if cat == "dali" else "Enerji (230V)"
+            ),
             "note": (
-                "Yukarı ve aşağı için ayrı faz damarı + nötr + toprak"
-                if ttype == "curtain" else
+                "Gateway → iç ünite haberleşme; enerji ayrıca panodan"
+                if is_control else
+                f"Ayrı faz damarları ({pair}) + nötr + toprak"
+                if two_way else
                 "Kanal çıkışı = anahtarlı faz; nötr ve toprak panodan"
             ),
         })
+
+    # Alternatif kanal kullanımı: tip başına TEK uyarı
+    for ttype, info in alt_used.items():
+        shown = ", ".join(info["loads"][:4])
+        more = f" ve {len(info['loads']) - 4} tane daha" if len(info["loads"]) > 4 else ""
+        iss = _issue("warn", "ALT_ACTUATOR", f"{shown}{more}: {info['warn']}")
+        iss["type"] = ttype
+        issues.append(iss)
+
+    # Klima / VRF iç ünite: enerji panodan DOĞRUDAN (sigorta) gelir
+    for f in editor.get("floors", []) or []:
+        for r in f.get("rooms", []) or []:
+            for d in r.get("devices", []) or []:
+                if d.get("type") not in CONTROL_TYPES:
+                    continue
+                dev_def = DEVICE_BY_TYPE[d.get("type")]
+                label = d.get("label") or dev_def["label"]
+                for k in range(max(1, _int(d.get("count", 1), 1))):
+                    cables.append({
+                        "_sort": (f.get("name", ""), "~", r.get("name", ""), label, k),
+                        "kind": "energy",
+                        "floor": f.get("name", ""),
+                        "from": "Pano / Ayrı sigorta (doğrudan besleme)",
+                        "to": r.get("name", "Oda"),
+                        "load": f"{label} {k + 1}",
+                        "cable": dev_def.get("cable", CABLE_ENERGY),
+                        "line": "Enerji (doğrudan)",
+                        "note": "Aktüatör kanalından geçmez; kontrol KNX gateway ile",
+                    })
 
     # Bağlanmamış yükler
     missing = []
@@ -286,7 +320,7 @@ def check_wiring(editor):
         more = f" ve {len(missing) - 5} tane daha" if len(missing) > 5 else ""
         issues.append(_issue(
             "warn", "LOAD_UNCONNECTED",
-            f"{len(missing)} yük henüz bir aktüatör kanalına bağlanmadı: "
+            f"{len(missing)} yük henüz bir aktüatör / gateway kanalına bağlanmadı: "
             f"{shown}{more}."
         ))
 
@@ -388,6 +422,12 @@ def analyze(data):
         )
         res = check_project(rules_data)
         w_issues, cables = check_wiring(editor)
+        # Kablo gerçekten çekildiyse proje düzeyindeki aynı uyarıyı tekrarlama
+        wired_alt = {i.get("type") for i in w_issues if i["code"] == "ALT_ACTUATOR"}
+        res["issues"] = [
+            i for i in res["issues"]
+            if not (i["code"] == "ALT_CHANNEL" and i.get("type") in wired_alt)
+        ]
         res["issues"].extend(w_issues)
         res["cables"] = cables
     else:

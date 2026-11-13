@@ -45,6 +45,12 @@ for _prefix in ("postgres://", "postgresql://"):
         break
 app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Veritabanı yeniden başlarsa (Render bakımı) ölü bağlantıyı kullanma:
+# her bağlantı kullanılmadan önce kontrol edilir ve gerekirse yenilenir.
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 280,
+}
 
 db = SQLAlchemy(app)
 
@@ -172,6 +178,7 @@ def load_user(user_id):
 
 from knx_rules import build_gas  # noqa: E402
 from knx_wiring import analyze  # noqa: E402
+from catalog import CATEGORY_LABEL, public_catalog  # noqa: E402
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -275,7 +282,7 @@ def make_pdf(data):
     rows = [[
         "Hat", "Kat", "Bus cihazı", "Bus akımı",
         "+%30 rezerv", "Mevcut PS", "Önerilen PS",
-        "Röle (ihtiyaç/var)", "Dimmer", "Perde"
+        "Kanallar (ihtiyaç / mevcut)"
     ]]
     for ln in res["lines"]:
         rows.append([
@@ -284,11 +291,12 @@ def make_pdf(data):
             f"{ln['psu_ma']} mA" if ln["psu_count"] else "YOK",
             f"{ln['recommended_psu']} mA"
             if ln["recommended_psu"] else "Hattı böl",
-            "{}/{}".format(*ln["relay"]),
-            "{}/{}".format(*ln["dimmer"]),
-            "{}/{}".format(*ln["blind"]),
+            Paragraph(escape(" · ".join(
+                f"{CATEGORY_LABEL.get(c, c)} {n}/{h}"
+                for c, (n, h) in (ln.get("channels") or {}).items()
+            ) or "—"), normal),
         ])
-    story.append(table(rows, [40, 90, 60, 65, 70, 70, 75, 95, 60, 60]))
+    story.append(table(rows, [40, 85, 55, 60, 65, 60, 65, 300]))
     story.append(Spacer(1, 6))
     story.append(Paragraph(
         "mA değerleri varsayılandır; kesin hesap için ürün "
@@ -562,6 +570,12 @@ def open_project(project_id):
 # --------------------------------
 # API
 # --------------------------------
+
+@app.route("/api/catalog")
+def catalog():
+    # Editör ürün listesini buradan alır (tek kaynak: catalog.py)
+    return jsonify(public_catalog())
+
 
 @app.route("/favicon.ico")
 def favicon():

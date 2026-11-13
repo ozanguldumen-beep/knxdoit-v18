@@ -1,5 +1,5 @@
 """
-KNXdoit v18 - KNX kural motoru
+KNXdoit - KNX kural motoru (katalog: catalog.py)
 
 Tek kaynak: hem ekrandaki saglik paneli, hem PDF, hem .knxproj
 ayni hesaplari bu dosyadan alir.
@@ -24,94 +24,16 @@ GA_MAIN_MAX = 31
 GA_MIDDLE_MAX = 7
 GA_SUB_MAX = 255
 
-# Pano urunlerinin varsayilan bus akimi (mA)
-DEFAULT_BUS_MA = {
-    "interface": 10,
-    "router": 20,
-    "line_coupler": 15,
-    "relay": 15,
-    "dimmer": 15,
-    "curtain_actuator": 15,
-    "input": 10,
-}
+from catalog import (  # noqa: E402  (tek kaynak)
+    DEFAULT_BUS_MA, CATEGORY_LABEL, COMPAT, COMPAT_NOTE, GA_GROUPS,
+    DEVICE_BY_TYPE, LOAD_TYPES, BUS_TYPES, OUTPUT_CATEGORIES,
+    device_objects, device_bus_ma,
+)
 
-# Odaya eklenen bus cihazlarinin varsayilan akimi (mA)
-ROOM_BUS_MA = {
-    "switch": 10,
-    "thermostat": 15,
-    "sensor": 10,
-}
-
-# Hangi oda cihazi hangi aktuator kanalini kullanir
-ACTUATOR_FOR = {
-    "light": "relay",
-    "valve": "relay",
-    "onoff": "relay",
-    "dim": "dimmer",
-    "curtain": "curtain_actuator",
-}
-
-CATEGORY_LABEL = {
-    "relay": "Switch Aktüatör",
-    "dimmer": "Dimmer Aktüatör",
-    "curtain_actuator": "Jalüzi/Perde Aktüatörü",
-}
-
-# Grup adresi ana gruplari (fonksiyon bazli)
-GA_MAIN = {
-    "light": (1, "Aydınlatma"),
-    "dim": (1, "Aydınlatma"),
-    "curtain": (2, "Perde / Jalüzi"),
-    "thermostat": (3, "Isıtma / HVAC"),
-    "valve": (3, "Isıtma / HVAC"),
-    "onoff": (5, "Genel Yükler"),
-    "switch": (4, "Tuş / Sensör"),
-    "sensor": (4, "Tuş / Sensör"),
-}
-
-# Nesne listesi: (kisa kod, DPT, fonksiyon adi)
-DPT = {
-    "light": [
-        ("SW", "DPST-1-1", "Aç/Kapa"),
-        ("SW_FB", "DPST-1-1", "Aç/Kapa D.B."),
-    ],
-    "dim": [
-        ("DIM_SW", "DPST-1-1", "Aç/Kapa"),
-        ("DIM_REL", "DPST-3-7", "Rölatif Dim"),
-        ("DIM_VAL", "DPST-5-1", "Değer"),
-        ("DIM_VAL_FB", "DPST-5-1", "Değer D.B."),
-    ],
-    "curtain": [
-        ("BLD_MOVE", "DPST-1-8", "Yukarı/Aşağı"),
-        ("BLD_STOP", "DPST-1-7", "Adım/Dur"),
-        ("BLD_POS", "DPST-5-1", "Pozisyon"),
-        ("BLD_POS_FB", "DPST-5-1", "Pozisyon D.B."),
-    ],
-    "thermostat": [
-        ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı"),
-        ("TEMP_ACT", "DPST-9-1", "Ortam Sıcaklığı"),
-        ("TEMP_MODE", "DPST-20-102", "Mod"),
-        ("TEMP_FB", "DPST-9-1", "Ayar D.B."),
-    ],
-    "switch": [
-        ("PUSH", "DPST-1-1", "Komut"),
-    ],
-    "sensor": [
-        ("SENS", "DPST-1-1", "Sensör"),
-    ],
-    "valve": [
-        ("VALVE", "DPST-1-1", "Vana Aç/Kapa"),
-    ],
-    "onoff": [
-        ("SW", "DPST-1-1", "Aç/Kapa"),
-        ("SW_FB", "DPST-1-1", "Aç/Kapa D.B."),
-    ],
-}
-
-# 230V yükler (aktüatör kanalına bağlanır) ve KNX bus cihazları
-ENERGY_TYPES = {"light", "dim", "curtain", "valve", "onoff"}
-BUS_TYPES = {"switch", "thermostat", "sensor"}
-LOAD_OUTPUT_CATEGORIES = {"relay", "dimmer", "curtain_actuator"}
+# Geriye uyumluluk adları
+ENERGY_TYPES = LOAD_TYPES
+LOAD_OUTPUT_CATEGORIES = OUTPUT_CATEGORIES
+ACTUATOR_FOR = {t: opts[0][0] for t, opts in COMPAT.items()}
 
 
 # --------------------------------
@@ -174,8 +96,10 @@ def build_gas(data):
 
         for room, dev in _room_devices(floor):
             dtype = dev.get("type")
-            main, main_name = GA_MAIN.get(dtype, GA_MAIN["light"])
-            objects = DPT.get(dtype, DPT["light"])
+            base = DEVICE_BY_TYPE.get(dtype, DEVICE_BY_TYPE["light"])
+            main = base["ga"]
+            main_name = GA_GROUPS[main]
+            objects = device_objects(dev)
             count = max(1, _int(dev.get("count", 1), 1))
 
             for n in range(1, count + 1):
@@ -239,8 +163,8 @@ def bus_devices_of_floor(floor):
 
     for room, dev in _room_devices(floor):
         dtype = dev.get("type")
-        if dtype not in ROOM_BUS_MA:
-            continue   # lamba, vana, perde motoru bus cihazi degil
+        if dtype not in BUS_TYPES:
+            continue   # 230V yükler ve gateway ile kontrol edilenler bus cihazı değil
         count = max(1, _int(dev.get("count", 1), 1))
         for n in range(1, count + 1):
             label = dev.get("label", "Cihaz")
@@ -248,7 +172,7 @@ def bus_devices_of_floor(floor):
                 "name": f"{label} {n}" if count > 1 else label,
                 "category": dtype,
                 "location": room.get("name", "Oda"),
-                "ma": ROOM_BUS_MA[dtype],
+                "ma": device_bus_ma(dev),
             })
 
     return items
@@ -384,56 +308,66 @@ def check_floor(floor, line_no):
             f"yakın, genişleme payı az."
         ))
 
-    # --- Aktuator kanallari ---
-    relay_have = _channels(floor, "relay")
-    relay_need = (
-        _needed(floor, "light")
-        + _needed(floor, "valve")
-        + _needed(floor, "onoff")
-    )
-    dim_have = _channels(floor, "dimmer")
-    dim_need = _needed(floor, "dim")
-    blind_have = _channels(floor, "curtain_actuator")
-    blind_need = _needed(floor, "curtain")
+    # --- Aktüatör / gateway kanalları (genel kural) ---
+    # Önce her yük kendi BİRİNCİL kanal tipine yerleştirilir; sığmayanlar
+    # izinli ALTERNATİFE (uyarıyla) taşınır; hiçbir yere sığmayan hatadır.
+    have = {}
+    for p in products:
+        cat = p.get("category")
+        if cat in OUTPUT_CATEGORIES:
+            have[cat] = have.get(cat, 0) + max(0, _int(p.get("channels"), 0))
+    free = dict(have)
 
-    line.update({
-        "relay": [relay_need, relay_have],
-        "dimmer": [dim_need, dim_have],
-        "blind": [blind_need, blind_have],
-    })
+    demand = {}   # yük tipi -> adet
+    for _, d in _room_devices(floor):
+        t = d.get("type")
+        if t in COMPAT:
+            demand[t] = demand.get(t, 0) + max(1, _int(d.get("count", 1), 1))
 
-    if dim_need > dim_have:
-        issues.append(_issue(
-            "error", "DIM_CHANNELS",
-            f"{name}: {dim_need} dim lamba var, dimmer kanalı "
-            f"{dim_have}. Dim lamba röleye bağlanırsa dim çalışmaz; "
-            f"{dim_need - dim_have} dimmer kanalı daha gerekli."
-        ))
+    need = {}     # kategori -> birincil ihtiyaç (kanal)
+    leftover = {}
+    for t, n in demand.items():
+        cat, span, _ = COMPAT[t][0]
+        need[cat] = need.get(cat, 0) + n * span
+        fit = min(n, free.get(cat, 0) // span)
+        free[cat] = free.get(cat, 0) - fit * span
+        if n - fit:
+            leftover[t] = n - fit
 
-    relay_spare = relay_have - relay_need
-    blind_missing = max(0, blind_need - blind_have)
-
-    if relay_spare < 0:
-        issues.append(_issue(
-            "error", "RELAY_CHANNELS",
-            f"{name}: Lamba + vana + on/off için {relay_need} röle kanalı "
-            f"gerekli, {relay_have} var. {-relay_spare} kanal eksik."
-        ))
-
-    if blind_missing:
-        if relay_spare >= blind_missing * 2:
+    for t, n in leftover.items():
+        label = DEVICE_BY_TYPE[t]["label"]
+        for cat, span, warn in COMPAT[t][1:]:
+            fit = min(n, free.get(cat, 0) // span)
+            if fit:
+                free[cat] -= fit * span
+                n -= fit
+                iss = _issue(
+                    "warn", "ALT_CHANNEL",
+                    f"{name}: {fit} adet {label} için "
+                    f"{CATEGORY_LABEL[COMPAT[t][0][0]]} kanalı yok; "
+                    f"{CATEGORY_LABEL[cat]} kullanılabilir. {warn}"
+                )
+                iss["type"] = t
+                issues.append(iss)
+            if not n:
+                break
+        if n:
+            primary = COMPAT[t][0][0]
+            note = COMPAT_NOTE.get(t, "")
             issues.append(_issue(
-                "warn", "BLIND_ON_RELAY",
-                f"{name}: {blind_missing} perde için perde aktüatörü "
-                f"kanalı yok. Boştaki röle kanallarıyla yapılacaksa "
-                f"perde başına 2 kanal (UP/DOWN) ve kilitleme gerekir."
+                "error", "CHANNELS_MISSING",
+                f"{name}: {n} adet {label} için "
+                f"{CATEGORY_LABEL[primary]} kanalı eksik. {note}".strip()
             ))
-        else:
-            issues.append(_issue(
-                "error", "BLIND_CHANNELS",
-                f"{name}: {blind_need} perde var, perde aktüatörü "
-                f"kanalı {blind_have}. {blind_missing} kanal eksik."
-            ))
+
+    line["channels"] = {
+        cat: [need.get(cat, 0), have.get(cat, 0)]
+        for cat in sorted(set(need) | set(have))
+    }
+    # geriye uyumlu alanlar (PDF/ekran eski sütunları)
+    line["relay"] = line["channels"].get("relay", [0, 0])
+    line["dimmer"] = line["channels"].get("dimmer", [0, 0])
+    line["blind"] = line["channels"].get("curtain_actuator", [0, 0])
 
     # --- Kollektor ---
     for c in floor.get("collectors", []) or []:

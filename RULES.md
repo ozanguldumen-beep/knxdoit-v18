@@ -1,4 +1,4 @@
-# KNXdoit v19 — Kural Listesi
+# KNXdoit v21 — Kural Listesi
 
 Kodda karşılığı: `knx_rules.py` (proje kuralları) ve `knx_wiring.py` (elle çekilen kablolar). Ekran, PDF ve `.knxproj` aynı hesaptan beslenir.
 Durum: 🔴 Hata (proje uygulanmamalı) · 🟠 Uyarı (kontrol edilmeli) · 🟢 Uygun
@@ -86,8 +86,35 @@ Kablo Çekim Listesi (PDF): her enerji kablosu için pano/ürün/kanal → oda �
 her bus kablosu için düğümden düğüme. Kesitler ÖRNEKTİR (aydınlatma 3×1.5, perde 4×1.5,
 bus 2×2×0.8 J-Y(St)Y); kesit ve sigortayı elektrikçi belirler.
 
+## Ürün kataloğu ve kanal uyumu (v21) — kaynak: `catalog.py`
+Her yükün BİRİNCİL kanal tipi vardır; birincil dolarsa izinli ALTERNATİF uyarıyla kullanılır.
+
+| Yük | Birincil | Alternatif |
+|---|---|---|
+| Lamba, On/Off | Switch Aktüatör | — |
+| Dim lamba | Dimmer Aktüatör | — (röleye bağlanırsa dim çalışmaz) |
+| RGBW LED şerit | RGBW / LED Kontrol | — |
+| DALI armatür | DALI Gateway (kontrol hattı) | — |
+| Perde motoru | Jalüzi Aktüatörü | Röle 2 kanal (Yukarı/Aşağı) + kilitleme 🟠 |
+| Termoelektrik vana (yerden ısıtma, kollektör) | Isıtma Aktüatörü | Röle 1 kanal 🟠 |
+| Solenoid vana | Switch Aktüatör | — |
+| Motorlu vana Aç/Kapa | Jalüzi Aktüatörü | Röle 2 kanal (Aç/Kapa) + kilitleme 🟠 |
+| Motorlu vana 0-10V | Analog Aktüatör | — |
+| Fancoil | Fancoil Aktüatörü | — |
+| Split klima | KNX-AC Gateway (1 iç ünite) | — · enerji panodan DOĞRUDAN (ayrı sigorta) |
+| VRF iç ünite | KNX-VRF Gateway (kapasite = kanal: 16 / 64) | — · enerji panodan DOĞRUDAN |
+
+| Kod | Kural | Seviye |
+|---|---|---|
+| CHANNELS_MISSING | Bir yük tipi için birincil + alternatif kanallar yetmiyor | 🔴 |
+| ALT_CHANNEL / ALT_ACTUATOR | Yük alternatif kanala yerleşti / bağlandı | 🟠 |
+
+Klima ve VRF için Kablo Çekim Listesi'ne iki satır düşer: gateway → iç ünite **kontrol hattı**
+ve panodan **doğrudan enerji** (ayrı sigorta). Tuş panellerinde (1/2/4/6/8) her tuşa bir grup adresi.
+Grup adresi ana grupları: 1 Aydınlatma · 2 Perde · 3 Isıtma/HVAC · 4 Tuş/Sensör · 5 Genel Yükler · 6 Klima.
+
 ## Henüz yok (sonraki sürümler)
 - Otomatik kanal ataması ("Otomatik bağla") — şimdilik kablolar elle çekiliyor
-- Klima/kombi (panodan doğrudan besleme) cihaz tipi, RGBW, çok tuşlu anahtar seçenekleri
+- Kombi, kapı otomasyonu; Akuvox / Akubela entegrasyonu (ürün bilgisi bekleniyor)
 - Kablo mesafesi kontrolü
 - `.knxproj` gerçek ETS'de **doğrulanmadı**

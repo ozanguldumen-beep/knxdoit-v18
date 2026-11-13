@@ -1,4 +1,4 @@
-# KNXdoit v20
+# KNXdoit v21
 
 Bayiler için KNX proje sihirbazı: kat/oda/pano tasarımı, KNX kural kontrolü,
 elektrikçi PDF'i ve `.knxproj` çıktısı.
@@ -24,6 +24,7 @@ SQLite (varsayılan) Render'da her deploy'da sıfırlanabilir; gerçek müşteri
 ## Dosya yapısı
 ```
 app.py          Flask: kullanıcı, proje, PDF, .knxproj
+catalog.py      ürün kataloğu (tek kaynak: cihazlar, ürünler, kanal uyumu, GA)
 knx_rules.py    KNX kural motoru (GA, fiziksel adres, PSU, kanallar)
 knx_wiring.py   elle çekilen kabloların kontrolü + Kablo Çekim Listesi
 run.py          yerel çalıştırma

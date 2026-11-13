@@ -3,9 +3,6 @@
 // Kablolar piksel olarak değil, BAĞLANTI olarak saklanır (kanal -> yük,
 // düğüm -> düğüm); ekrandaki çizgi her seferinde bu bağlantıdan çizilir.
 
-import {
-  ROOM_DEVICES, PANEL_PRODUCTS, ACTUATOR_FOR, CATEGORY_LABEL
-} from "./devices.js";
 import { renderHealth, escapeHtml } from "./rules.js";
 import { downloadFile } from "./pdf.js";
 import { drawPanel } from "./canvas.js";
@@ -14,13 +11,33 @@ const $ = id => document.getElementById(id);
 const esc = escapeHtml;
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-const DEV = Object.fromEntries(ROOM_DEVICES.map(d => [d.type, d]));
-const ENERGY = new Set(ROOM_DEVICES.filter(d => d.energy).map(d => d.type));
-const BUS = new Set(ROOM_DEVICES.filter(d => !d.energy).map(d => d.type));
-const OUTPUT_CATS = new Set(["relay", "dimmer", "curtain_actuator"]);
+// Katalog sunucudan gelir (/api/catalog, kaynak: catalog.py)
+let ROOM_DEVICES = [], PANEL_PRODUCTS = [], CATEGORY_LABEL = {};
+let COMPAT = {}, COMPAT_NOTE = {};
+let DEV = {}, DEV_BY_ID = {};
+let ENERGY = new Set(), BUS = new Set(), OUTPUT_CATS = new Set();
+
+async function loadCatalog() {
+  const c = await (await fetch("/api/catalog")).json();
+  ROOM_DEVICES = c.devices;
+  PANEL_PRODUCTS = c.products;
+  CATEGORY_LABEL = c.categoryLabel;
+  COMPAT = c.compat;
+  COMPAT_NOTE = c.compatNote;
+  DEV_BY_ID = Object.fromEntries(ROOM_DEVICES.map(d => [d.id, d]));
+  DEV = {};
+  ROOM_DEVICES.forEach(d => { if (!DEV[d.type]) DEV[d.type] = d; });
+  ENERGY = new Set(ROOM_DEVICES.filter(d => d.kind !== "bus").map(d => d.type));
+  BUS = new Set(ROOM_DEVICES.filter(d => d.kind === "bus").map(d => d.type));
+  OUTPUT_CATS = new Set(Object.values(COMPAT).flat().map(o => o.category));
+}
+
+function devInfo(d) { return DEV[d.type] || { icon: "•", label: d.type, kind: "load" }; }
 
 const COLOR_ENERGY = "#8B4513";
 const COLOR_BUS = "#16a34a";
+const COLOR_CONTROL = "#0284c7";   // gateway -> klima / VRF / DALI kontrol hattı
+const GATEWAY_CATS = new Set(["ac_gateway", "vrf_gateway", "dali"]);
 
 const HINTS = {
   select: "Odaları, panoları ve kollektörleri başlığından tutup sürükleyin.",
@@ -169,10 +186,10 @@ function targetName(to) {
 function checkEnergy(prod, ch, to) {
   const ttype = targetType(to);
   if (!ENERGY.has(ttype)) {
-    return { ok: false, msg: "Bu bir KNX cihazı; aktüatör kanalına bağlanmaz. KNX Bus Kablosu aracını kullanın." };
+    return { ok: false, msg: "Bu bir KNX cihazı; aktüatör kanalına bağlanmaz. Bus Kablosu aracını kullanın." };
   }
   if (!OUTPUT_CATS.has(prod.category)) {
-    return { ok: false, msg: `${prod.name} ürününün yük çıkışı yok.` };
+    return { ok: false, msg: `${prod.name} ürününün yük / kontrol çıkışı yok.` };
   }
   if (state.links.some(l => sameTarget(l.to, to))) {
     return { ok: false, msg: `${targetName(to)} zaten bir kanala bağlı. Bir yük tek çıkıştan beslenir.` };
@@ -180,22 +197,17 @@ function checkEnergy(prod, ch, to) {
   const occ = occupancy()[prod.id] || {};
   if (occ[ch]) return { ok: false, msg: `Kanal ${ch + 1} dolu.` };
 
-  const need = ACTUATOR_FOR[ttype];
-  if (prod.category === need) return { ok: true, span: 1 };
-
-  if (ttype === "curtain" && prod.category === "relay") {
-    if (ch + 1 >= prod.channels || occ[ch + 1]) {
-      return { ok: false, msg: `Perde röleye bağlanacaksa yanındaki kanal (${ch + 2}) da boş olmalı: Yukarı + Aşağı.` };
-    }
-    return {
-      ok: true, span: 2, warn:
-        `Perde, röle kanalı ${ch + 1}-${ch + 2} ile bağlandı (Yukarı/Aşağı). ETS'de kilitleme ayarlanmalı.`
-    };
+  const opts = COMPAT[ttype] || [];
+  const opt = opts.find(o => o.category === prod.category);
+  if (!opt) {
+    const want = opts.length ? CATEGORY_LABEL[opts[0].category] : "uygun";
+    const label = (DEV[ttype] || {}).label || ttype;
+    return { ok: false, msg: `${label} için ${want} kanalı gerekli. ${COMPAT_NOTE[ttype] || ""}`.trim() };
   }
-  if (ttype === "dim") {
-    return { ok: false, msg: "Dim lamba röleye bağlanırsa dim çalışmaz. Dimmer Aktüatör kanalına bağlayın." };
+  if (opt.span === 2 && (ch + 1 >= prod.channels || occ[ch + 1])) {
+    return { ok: false, msg: `Bu bağlantı 2 kanal kaplar; yanındaki kanal (${ch + 2}) da boş olmalı.` };
   }
-  return { ok: false, msg: `${DEV[ttype].label} için ${CATEGORY_LABEL[need]} kanalı gerekli.` };
+  return { ok: true, span: opt.span, warn: opt.warn || null };
 }
 
 // --------------------------------
@@ -208,7 +220,7 @@ function nodeOk(node) {
   if (kind === "dev") {
     const d = findDevice(id);
     if (d && BUS.has(d.dev.type)) return { ok: true };
-    return { ok: false, msg: `${d ? d.dev.label : "Bu cihaz"} bir 230V yüktür; KNX bus'a bağlanmaz. Enerji Kablosu aracını kullanın.` };
+    return { ok: false, msg: `${d ? d.dev.label : "Bu cihaz"} KNX bus cihazı değil; bus kablosu bağlanmaz. Enerji Kablosu aracıyla aktüatör / gateway kanalına bağlayın.` };
   }
   return { ok: false, msg: "Kollektör dolabına KNX bus girmez." };
 }
@@ -306,10 +318,11 @@ function roomHtml(r) {
   const total = r.devices.reduce((a, d) => a + d.count, 0);
   const chips = r.devices.flatMap(d =>
     Array.from({ length: d.count }, (_, k) => {
-      const info = DEV[d.type] || DEV.light;
-      const cls = info.energy ? "energy" : "knx";
+      const info = devInfo(d);
+      const cls = info.kind === "bus" ? "knx" : info.kind === "control" ? "ctl" : "energy";
+      const kindTxt = info.kind === "bus" ? "KNX cihazı" : info.kind === "control" ? "Gateway ile kontrol" : "230V yük";
       return `<button class="dchip ${cls}" id="dv-${d.id}-${k}" data-dev="${d.id}" data-k="${k}"
-        title="${esc(d.label)} ${k + 1} · ${info.energy ? "230V yük" : "KNX cihazı"}">
+        title="${esc(d.label)} ${k + 1} · ${kindTxt}">
         <span class="ic">${info.icon}</span><span class="n">${k + 1}</span></button>`;
     })
   ).join("");
@@ -444,7 +457,9 @@ function drawWires() {
     const a = $(`ch-${l.prod}-${l.ch}`), b = targetEl(l.to);
     if (!a || !b) continue;
     const ca = center(a), cb = center(b);
-    curve(ca, cb, COLOR_ENERGY, 2.5);
+    const pf = findProduct(l.prod);
+    const isCtl = pf && GATEWAY_CATS.has(pf.prod.category);
+    curve(ca, cb, isCtl ? COLOR_CONTROL : COLOR_ENERGY, 2.5, isCtl ? [8, 5] : null);
     wireGeom.push({ type: "link", id: l.id, a: ca, b: cb });
     if (l.span === 2) {
       const a2 = $(`ch-${l.prod}-${l.ch + 1}`);
@@ -831,34 +846,49 @@ function onRename(hdr) {
 // CİHAZ / ÜRÜN EKLEME
 // --------------------------------
 
+function addDevice(room, catId, qty, label) {
+  const c = DEV_BY_ID[catId];
+  const name = label || c.label;
+  const ex = room.devices.find(d => d.type === c.type && d.label === name);
+  if (ex) ex.count += qty;
+  else room.devices.push({
+    id: uid(), type: c.type, label: name, count: qty,
+    ...(c.buttons ? { buttons: c.buttons } : {}),
+    ...(c.inputs ? { inputs: c.inputs } : {})
+  });
+}
+
+function deviceGroupsHtml(btnClass, attr, chosen) {
+  const groups = {};
+  ROOM_DEVICES.forEach(d => (groups[d.group] = groups[d.group] || []).push(d));
+  return Object.entries(groups).map(([g, list]) => `
+    <div class="ed-group">${esc(g)}</div>
+    ${list.map(d => `<button type="button" class="${btnClass} ${d.id === chosen ? "on" : ""}" ${attr}="${d.id}">
+        <span class="ic">${d.icon}</span><span class="nm">${esc(d.label)}</span>
+        <small class="${d.kind === "bus" ? "k" : d.kind === "control" ? "c" : "e"}">${d.kind === "bus" ? "KNX" : d.kind === "control" ? "Gateway" : "230V"}</small>
+      </button>`).join("")}`).join("");
+}
+
 function showDeviceModal(roomId) {
   const room = floor().rooms.find(r => r.id === roomId);
   if (!room) return;
-  let chosen = ROOM_DEVICES[0].type;
+  let chosen = ROOM_DEVICES[0].id;
   openModal(`${room.name}: Cihaz Ekle`, `
-    <div class="devgrid">${ROOM_DEVICES.map(d => `
-      <button type="button" class="devbtn ${d.type === chosen ? "on" : ""}" data-type="${d.type}">
-        <span class="ic">${d.icon}</span><span>${d.label}</span>
-        <small class="${d.energy ? "e" : "k"}">${d.energy ? "230V yük" : "KNX cihazı"}</small>
-      </button>`).join("")}
-    </div>
+    <div class="devlist">${deviceGroupsHtml("ed-item devpick", "data-cat", chosen)}</div>
     <label>Adet<input id="mCount" type="number" min="1" max="50" value="1"></label>
-    <label>İsim<input id="mLabel" value="${esc(DEV[chosen].label)}"></label>`,
+    <label>İsim<input id="mLabel" value="${esc(DEV_BY_ID[chosen].label)}"></label>`,
     () => {
       const cnt = Math.min(50, Math.max(1, Number($("mCount").value) || 1));
-      const label = $("mLabel").value.trim() || DEV[chosen].label;
       snapshot();
-      const ex = room.devices.find(d => d.type === chosen && d.label === label);
-      if (ex) ex.count += cnt;
-      else room.devices.push({ id: uid(), type: chosen, label, count: cnt });
+      addDevice(room, chosen, cnt, $("mLabel").value.trim());
       changed();
     });
-  $("modalBody").querySelectorAll(".devbtn").forEach(b => b.onclick = () => {
-    $("modalBody").querySelectorAll(".devbtn").forEach(x => x.classList.remove("on"));
+  $("modalBody").querySelectorAll(".devpick").forEach(b => b.onclick = () => {
+    $("modalBody").querySelectorAll(".devpick").forEach(x => x.classList.remove("on"));
     b.classList.add("on");
-    const prevDefault = DEV[chosen].label;
-    chosen = b.dataset.type;
-    if ($("mLabel").value === prevDefault) $("mLabel").value = DEV[chosen].label;
+    const prevDefault = DEV_BY_ID[chosen].label;
+    chosen = b.dataset.cat;
+    if ($("mLabel").value === prevDefault) $("mLabel").value = DEV_BY_ID[chosen].label;
   });
 }
 
@@ -929,11 +959,7 @@ function renderStats() {
 }
 
 function buildSideLists() {
-  $("deviceList").innerHTML = ROOM_DEVICES.map(d => `
-    <button class="ed-item" data-side-dev="${d.type}">
-      <span class="ic">${d.icon}</span><span class="nm">${d.label}</span>
-      <small class="${d.energy ? "e" : "k"}">${d.energy ? "230V" : "KNX"}</small>
-    </button>`).join("");
+  $("deviceList").innerHTML = deviceGroupsHtml("ed-item", "data-side-dev", null);
 
   const groups = {};
   PANEL_PRODUCTS.forEach(p => (groups[p.category] = groups[p.category] || []).push(p));
@@ -953,12 +979,11 @@ $("deviceList").addEventListener("click", e => {
     setTool("room");
     return toast("Önce bir oda çizin: boş alanda sürükleyin.", "warn");
   }
-  const type = b.dataset.sideDev;
+  const catId = b.dataset.sideDev;
   const qty = Math.min(50, Math.max(1, Number($("devQty").value) || 1));
-  const label = DEV[type].label;
+  const label = DEV_BY_ID[catId].label;
   snapshot();
-  const ex = room.devices.find(d => d.type === type && d.label === label);
-  if (ex) ex.count += qty; else room.devices.push({ id: uid(), type, label, count: qty });
+  addDevice(room, catId, qty);
   changed();
   toast(`${room.name}: ${qty} adet ${label} eklendi.`);
 });
@@ -996,7 +1021,7 @@ function renderDin() {
     panelProducts: panel ? panel.products : [],
     rooms: f.rooms.map(r => ({
       name: r.name,
-      devices: r.devices.map(d => ({ ...d, letter: letters[d.type] }))
+      devices: r.devices.map(d => ({ ...d, letter: letters[d.type] || d.label }))
     }))
   });
 }
@@ -1171,7 +1196,13 @@ function fromV18(saved) {
   };
 }
 
-(function init() {
+(async function init() {
+  try {
+    await loadCatalog();
+  } catch (e) {
+    toast("Ürün kataloğu yüklenemedi; sayfayı yenileyin.", "error");
+    return;
+  }
   const saved = JSON.parse($("savedData").textContent);
   if (saved) {
     if (saved.project_name) $("projectName").value = saved.project_name;

@@ -892,3 +892,15 @@ a.project-row:hover { border-color: #185fa5; }
 .rbox.selected { box-shadow: 0 0 0 4px rgba(24,95,165,.28); }
 .rbox.selected .rhdr { background: #0b3d74; }
 .pbox.selected { box-shadow: 0 0 0 4px rgba(95,94,90,.25); }
+
+/* v21: gateway ile kontrol edilen cihazlar (klima, VRF) */
+.dchip.ctl { border-color: #7dd3fc; color: #075985; }
+.ed-item small.c { color: #0369a1; }
+.devlist { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+.ed-item.on { border-color: #185fa5; background: #e6f1fb; }
+.chbtn.used.c-valve, .chbtn.used.c-valve_solenoid, .chbtn.used.c-valve_motor, .chbtn.used.c-valve_prop { background: #fdecec; border-color: #fca5a5; }
+.chbtn.used.c-ac_split, .chbtn.used.c-vrf_indoor { background: #e0f2fe; border-color: #7dd3fc; }
+.chbtn.used.c-fancoil { background: #fef3c7; border-color: #fcd34d; }
+.chgrid { max-width: 330px; }
+
+.lg-ctl { background: repeating-linear-gradient(90deg,#0284c7 0 6px,transparent 6px 10px); }
