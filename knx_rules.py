@@ -24,6 +24,7 @@ GA_MAIN_MAX = 31
 GA_MIDDLE_MAX = 7
 GA_SUB_MAX = 255
 
+import math
 from catalog import (  # noqa: E402  (tek kaynak)
     DEFAULT_BUS_MA, CATEGORY_LABEL, COMPAT, COMPAT_NOTE, GA_GROUPS,
     DEVICE_BY_TYPE, LOAD_TYPES, BUS_TYPES, OUTPUT_CATEGORIES,
@@ -396,6 +397,27 @@ def check_floor(floor, line_no):
             f"PoE ile beslenmeli: PoE switch portu ve Cat6 kablo planlayın."
         ))
     line["supply24"] = cnt(req24)
+
+    # 24V güç kaynağı boyutlandırma: toplam W x 1.3 (PoE'ye kalanlar hariç)
+    fed = req24 if has24 else []
+    def _w(d):
+        return _int(DEVICE_BY_TYPE.get(d.get("type"), {}).get("w24", 10), 10)
+    need_w = sum(_w(d) * max(1, _int(d.get("count", 1), 1)) for d in fed)
+    est = any(DEVICE_BY_TYPE.get(d.get("type"), {}).get("w24Est") for d in fed)
+    have_w = sum(_int(p.get("watts", 0), 0) for p in products if p.get("category") == "psu24")
+    req_w = math.ceil(need_w * 1.3) if need_w else 0
+    line["w24"] = need_w
+    line["w24_required"] = req_w
+    line["w24_installed"] = have_w
+    line["w24_recommended"] = next((x for x in (30, 60, 100) if x >= req_w), None) if req_w else None
+    if has24 and req_w > have_w:
+        issues.append(_issue(
+            "error", "SUPPLY24_LOW",
+            f"{name}: 24V paneller ~{need_w} W çekiyor (+%30 = {req_w} W) ama panodaki "
+            f"24V güç kaynağı toplamı {have_w} W. Daha büyük kaynak ekleyin"
+            + (" veya beslemeyi ikiye bölün." if req_w > 100 else ".")
+            + (" (Bazı panel değerleri tahmindir.)" if est else "")
+        ))
 
     # --- Kollektor ---
     for c in floor.get("collectors", []) or []:

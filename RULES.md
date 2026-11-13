@@ -133,7 +133,10 @@ kapasitesine sayılır. Dim lamba bu rölelere bağlanamaz.
 - Katalog: 24V DC Güç Kaynağı 30 W / 60 W / 100 W. KNX bus cihazı değildir: fiziksel adres almaz,
   bus akımına sayılmaz.
 - Kablo listesi her 24V cihaz için panodan "24V DC besleme" hattı (2×1.5) üretir.
-- 24V güç kaynağı boyutlandırması henüz yok (panel başına W değeri bekleniyor).
+- **24V güç kaynağı boyutlandırma:** toplam panel W × 1.3 ≥ kurulu 24V kaynak W; değilse **SUPPLY24_LOW**.
+  Öneri 30 / 60 / 100 W; 100 W'ı aşarsa beslemeyi bölün.
+  Değerler: Pro 10 W, PS51 5 W (datasheet). Elite 10 → 10 W, KeyPlus 5 W, Lux 5 W, Supreme 15 W,
+  Ultra 10 W **tahmini** (datasheet bulunamadı).
 
 ## Henüz yok (sonraki sürümler)
 - Otomatik kanal ataması ("Otomatik bağla") — şimdilik kablolar elle çekiliyor

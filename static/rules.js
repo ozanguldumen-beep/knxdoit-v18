@@ -31,6 +31,7 @@ export function renderHealth(el, result) {
       PS: ${l.psu_count ? l.psu_ma + " mA" : "yok"}
       ${l.recommended_psu ? `· öneri ${l.recommended_psu} mA` : "· hattı böl"}
       ${l.supply24 ? `<br>24V DC / PoE isteyen ekran: ${l.supply24}` : ""}
+      ${l.w24 ? ` · 24V: ${l.w24} W (+%30 = ${l.w24_required} W) · kurulu ${l.w24_installed} W${l.w24_recommended ? " · öneri " + l.w24_recommended + " W" : " · beslemeyi böl"}` : ""}
     </div>
   `).join("");
 
