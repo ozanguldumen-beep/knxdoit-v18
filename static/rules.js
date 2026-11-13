@@ -30,6 +30,7 @@ export function renderHealth(el, result) {
       (+%30 = ${l.required_ma} mA) ·
       PS: ${l.psu_count ? l.psu_ma + " mA" : "yok"}
       ${l.recommended_psu ? `· öneri ${l.recommended_psu} mA` : "· hattı böl"}
+      ${l.supply24 ? `<br>24V DC / PoE isteyen ekran: ${l.supply24}` : ""}
     </div>
   `).join("");
 

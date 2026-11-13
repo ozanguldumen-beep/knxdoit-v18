@@ -28,6 +28,7 @@ from catalog import (  # noqa: E402  (tek kaynak)
     DEFAULT_BUS_MA, CATEGORY_LABEL, COMPAT, COMPAT_NOTE, GA_GROUPS,
     DEVICE_BY_TYPE, LOAD_TYPES, BUS_TYPES, OUTPUT_CATEGORIES,
     device_objects, device_bus_ma, device_relays,
+    SUPPLY24_TYPES, NON_BUS_CATEGORIES, POE_TYPES,
 )
 
 # Geriye uyumluluk adları
@@ -151,7 +152,7 @@ def bus_devices_of_floor(floor):
 
     for p in floor.get("panelProducts", []) or []:
         cat = p.get("category")
-        if cat == "power_supply":
+        if cat in NON_BUS_CATEGORIES:
             continue
         ma = _int(p.get("busMa"), DEFAULT_BUS_MA.get(cat, 10))
         items.append({
@@ -373,6 +374,28 @@ def check_floor(floor, line_no):
     line["relay"] = line["channels"].get("relay", [0, 0])
     line["dimmer"] = line["channels"].get("dimmer", [0, 0])
     line["blind"] = line["channels"].get("curtain_actuator", [0, 0])
+
+    # --- 24V DC besleme (ekranlı paneller; Aura hariç) ---
+    req24 = [d for _, d in _room_devices(floor) if d.get("type") in SUPPLY24_TYPES]
+    hard = [d for d in req24 if d.get("type") not in POE_TYPES]     # sadece 24V
+    soft = [d for d in req24 if d.get("type") in POE_TYPES]         # 24V veya PoE
+    cnt = lambda ds: sum(max(1, _int(d.get("count", 1), 1)) for d in ds)
+    lbl = lambda ds: ", ".join(sorted({
+        d.get("label") or DEVICE_BY_TYPE.get(d.get("type"), {}).get("label", "Panel") for d in ds}))
+    has24 = any(p.get("category") == "psu24" for p in products)
+    if hard and not has24:
+        issues.append(_issue(
+            "error", "SUPPLY24_MISSING",
+            f"{name}: {cnt(hard)} ekranlı panel 24V DC besleme istiyor ({lbl(hard)}) "
+            f"ama panoda 24V DC güç kaynağı yok."
+        ))
+    if soft and not has24:
+        issues.append(_issue(
+            "warning", "POE_SUPPLY",
+            f"{name}: {cnt(soft)} panel ({lbl(soft)}) panoda 24V DC kaynak olmadığı için "
+            f"PoE ile beslenmeli: PoE switch portu ve Cat6 kablo planlayın."
+        ))
+    line["supply24"] = cnt(req24)
 
     # --- Kollektor ---
     for c in floor.get("collectors", []) or []:

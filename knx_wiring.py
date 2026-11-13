@@ -17,7 +17,7 @@ Kablo kesitleri ÖRNEKTİR; kesit ve sigortayı elektrikçi belirler.
 
 from knx_rules import _issue, _int
 from catalog import (
-    device_relays, relay_prod_id,
+    device_relays, relay_prod_id, SUPPLY24_TYPES, POE_TYPES,
     COMPAT, COMPAT_NOTE, CATEGORY_LABEL, DEVICE_BY_TYPE,
     LOAD_TYPES as ENERGY_TYPES, BUS_TYPES, CONTROL_TYPES,
     GATEWAY_CATEGORIES,
@@ -278,7 +278,7 @@ def check_wiring(editor):
                 "DALI hattı" if cat == "dali" else "Enerji (230V)"
             ),
             "note": (
-                "Panelin dahili kuru kontak rölesi; yük akımını datasheet'ten kontrol edin"
+                "Panel dahili kuru kontak rölesi: maks. 1 A (≈230 W rezistif; LED'de ani akım nedeniyle daha az)"
                 if is_builtin else
                 "Gateway → iç ünite haberleşme; enerji ayrıca panodan"
                 if is_control else
@@ -315,6 +315,47 @@ def check_wiring(editor):
                         "cable": dev_def.get("cable", CABLE_ENERGY),
                         "line": "Enerji (doğrudan)",
                         "note": "Aktüatör kanalından geçmez; kontrol KNX gateway ile",
+                    })
+
+    # 24V DC besleme hattı: panodaki 24V güç kaynağından her panele
+    for f in editor.get("floors", []) or []:
+        src = next(
+            (f"{p.get('name', 'Pano')} / {pr.get('name')}"
+             for p in f.get("panels", []) or []
+             for pr in p.get("products", []) or []
+             if pr.get("category") == "psu24"),
+            None
+        )
+        for r in f.get("rooms", []) or []:
+            for d in r.get("devices", []) or []:
+                if d.get("type") not in SUPPLY24_TYPES:
+                    continue
+                label = d.get("label") or TYPE_LABEL.get(d.get("type"), "Panel")
+                poe = src is None and d.get("type") in POE_TYPES
+                for k in range(max(1, _int(d.get("count", 1), 1))):
+                    if poe:
+                        cables.append({
+                            "_sort": (f.get("name", ""), "~24", r.get("name", ""), label, k),
+                            "kind": "energy",
+                            "floor": f.get("name", ""),
+                            "from": "Network / PoE switch",
+                            "to": r.get("name", "Oda"),
+                            "load": f"{label} {k + 1}",
+                            "cable": "Cat6 (PoE)",
+                            "line": "PoE besleme + data",
+                            "note": "24V yerine PoE ile beslenir; switch portu PoE (802.3af/at) olmalı",
+                        })
+                        continue
+                    cables.append({
+                        "_sort": (f.get("name", ""), "~24", r.get("name", ""), label, k),
+                        "kind": "energy",
+                        "floor": f.get("name", ""),
+                        "from": src or "Pano / 24V DC güç kaynağı (YOK)",
+                        "to": r.get("name", "Oda"),
+                        "load": f"{label} {k + 1}",
+                        "cable": "2×1.5 (24V DC)",
+                        "line": "24V DC besleme",
+                        "note": "Ekranlı panel beslemesi; uzun hatlarda gerilim düşümüne dikkat",
                     })
 
     # Bağlanmamış yükler

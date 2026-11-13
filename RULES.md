@@ -120,7 +120,20 @@ Ultra; Aura K32-B4 4 tuş (çoklu / tekli), Aura K32-M termostat (çoklu / tekli
 Dahili röle çıkışı olanlar (Lux, Pro, Supreme, Ultra, PS51-KS41: 2 röle) odada **R1/R2** kanalı olarak
 görünür; lamba / on-off / solenoid vana gibi röle yükleri doğrudan bunlara bağlanabilir ve röle
 kapasitesine sayılır. Dim lamba bu rölelere bağlanamaz.
-⚠️ Dahili röle yük akımı, bus akımı (varsayılan 10 mA) ve panel beslemesi datasheet'ten doğrulanmalı.
+
+**v23 — Modüler Otomasyon bilgisi:**
+- Dahili röleler **maks. 1 A** (≈230 W rezistif; LED sürücülerde ani akım nedeniyle daha az). Dahili
+  röleye yük bağlanınca editör uyarır; Kablo Çekim Listesi'nde not olarak yazılır.
+- Bus akımı **10 mA** (her Akubela cihazı).
+- **Ekranlı tüm cihazlar 24V DC ayrı besleme ister** (Elite 10, KeyPlus, PS51-KS41, Lux, Pro, Supreme,
+  Ultra). **Aura serisi (K32-B4, K32-M) istemez.** Katta 24V isteyen cihaz varken o katın panosunda
+  `psu24` kategorisinde güç kaynağı yoksa **SUPPLY24_MISSING** hatası.
+- **Hypanel Elite 10 (PH59) PoE ile de çalışır:** panoda 24V kaynak yoksa hata değil **POE_SUPPLY**
+  uyarısı verilir; kablo listesinde "Network / PoE switch → Cat6 (PoE)" hattı yazılır.
+- Katalog: 24V DC Güç Kaynağı 30 W / 60 W / 100 W. KNX bus cihazı değildir: fiziksel adres almaz,
+  bus akımına sayılmaz.
+- Kablo listesi her 24V cihaz için panodan "24V DC besleme" hattı (2×1.5) üretir.
+- 24V güç kaynağı boyutlandırması henüz yok (panel başına W değeri bekleniyor).
 
 ## Henüz yok (sonraki sürümler)
 - Otomatik kanal ataması ("Otomatik bağla") — şimdilik kablolar elle çekiliyor

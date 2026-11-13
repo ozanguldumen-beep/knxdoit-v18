@@ -150,43 +150,44 @@ ROOM_DEVICES = [
      "objects": [("SENS", "DPST-1-1", "Sensör")]},
 
     # --- Akubela (Modüler Otomasyon) ---
-    # Açıklamalar ürün listesinden alınmıştır. Dahili röle yük akımı, bus
-    # akımı ve panel beslemesi DATASHEET'ten doğrulanmalıdır.
-    {"id": "akb_elite10", "type": "akb_elite10", "brand": "Akubela", "sku": None,
+    # Açıklamalar ürün listesinden alınmıştır. Modüler Otomasyon bilgisi:
+    # dahili röleler maks. 1 A; bus akımı 10 mA; ekranlı tüm cihazlar
+    # 24V DC ayrı besleme ister, Aura serisi (K32-B4 / K32-M) istemez.
+    {"id": "akb_elite10", "supply": "24V DC", "poe": True, "type": "akb_elite10", "brand": "Akubela", "sku": None,
      "label": "Akubela Hypanel Elite 10\" PH59-KNX", "icon": "🖥",
-     "desc": "10\" KNX dokunmatik panel",
+     "desc": "10\" KNX dokunmatik panel; 24V DC veya PoE ile beslenebilir",
      "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 0,
      "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı")]},
-    {"id": "akb_keyplus", "type": "akb_keyplus", "brand": "Akubela", "sku": "153-02-321",
+    {"id": "akb_keyplus", "supply": "24V DC", "type": "akb_keyplus", "brand": "Akubela", "sku": "153-02-321",
      "label": "Akubela Hypanel KeyPlus KS03 KNX", "icon": "🎛",
      "desc": "Ekranlı tuşlu KNX panel",
      "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 0,
      "objects": [("SCENE", "DPST-18-1", "Sahne"), ("PUSH1", "DPST-1-1", "Tuş 1"),
                  ("PUSH2", "DPST-1-1", "Tuş 2"), ("PUSH3", "DPST-1-1", "Tuş 3")]},
-    {"id": "akb_ps51", "type": "akb_ps51", "brand": "Akubela", "sku": "153-02-124",
+    {"id": "akb_ps51", "supply": "24V DC", "relayAmps": 1, "type": "akb_ps51", "brand": "Akubela", "sku": "153-02-124",
      "label": "Akubela Hypanel KNX Kasası PS51-KS41", "icon": "🔲",
      "desc": "Hypanel KNX kasası, ilave 2 kuru kontak röle",
      "group": "Akubela", "kind": "bus", "ga": 1, "ma": 10, "relays": 2,
      "objects": []},
-    {"id": "akb_lux", "type": "akb_lux", "brand": "Akubela", "sku": None,
+    {"id": "akb_lux", "relayAmps": 1, "supply": "24V DC", "type": "akb_lux", "brand": "Akubela", "sku": None,
      "label": "Akubela Hypanel Lux RT61 KNX", "icon": "⏺",
      "desc": "Android 10, döner yuvarlak 2.3\" ekran, 4 fiziksel buton, dahili 2 röle, dahili sıcaklık-nem sensörü",
      "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
      "objects": [("PUSH1", "DPST-1-1", "Tuş 1"), ("PUSH2", "DPST-1-1", "Tuş 2"),
                  ("PUSH3", "DPST-1-1", "Tuş 3"), ("PUSH4", "DPST-1-1", "Tuş 4"),
                  ("TEMP", "DPST-9-1", "Sıcaklık"), ("HUM", "DPST-9-7", "Nem")]},
-    {"id": "akb_pro", "type": "akb_pro", "brand": "Akubela", "sku": None,
+    {"id": "akb_pro", "relayAmps": 1, "supply": "24V DC", "type": "akb_pro", "brand": "Akubela", "sku": None,
      "label": "Akubela Hypanel Pro KNX (8\", kameralı)", "icon": "📷",
      "desc": "Kameralı 8\" KNX panel, 2 röle ilaveli",
      "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
      "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı")]},
-    {"id": "akb_supreme", "type": "akb_supreme", "brand": "Akubela", "sku": None,
+    {"id": "akb_supreme", "relayAmps": 1, "supply": "24V DC", "type": "akb_supreme", "brand": "Akubela", "sku": None,
      "label": "Akubela Hypanel Supreme KNX (12.36\")", "icon": "🖥",
      "desc": "12.36\" KNX, 2 çıkış, 1 kapı zili girişi, Zigbee, 2M kasa",
      "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
      "objects": [("SCENE", "DPST-18-1", "Sahne"), ("TEMP_SET", "DPST-9-1", "Ayar Sıcaklığı"),
                  ("BELL", "DPST-1-1", "Kapı Zili")]},
-    {"id": "akb_ultra", "type": "akb_ultra", "brand": "Akubela", "sku": None,
+    {"id": "akb_ultra", "relayAmps": 1, "supply": "24V DC", "type": "akb_ultra", "brand": "Akubela", "sku": None,
      "label": "Akubela Hypanel Ultra KNX (10\")", "icon": "🖥",
      "desc": "10\" KNX, 2 çıkış, 1 kapı zili girişi, Zigbee, 2M kasa",
      "group": "Akubela", "kind": "bus", "ga": 4, "ma": 10, "relays": 2,
@@ -267,6 +268,7 @@ COMPAT_NOTE = {
 
 CATEGORY_LABEL = {
     "power_supply": "Power Supply",
+    "psu24": "24V DC Güç Kaynağı",
     "interface": "Programlama Arayüzü",
     "router": "IP Router",
     "line_coupler": "Line Coupler",
@@ -301,6 +303,10 @@ PANEL_PRODUCTS = [
     {"id": "usb-interface", "name": "KNX USB Interface", "category": "interface", "moduleWidth": 2, "channels": 1, "busMa": 10, "color": "#7c3aed"},
     {"id": "ip-router", "name": "KNX IP Router", "category": "router", "moduleWidth": 2, "channels": 1, "busMa": 20, "color": "#334155"},
     {"id": "line-coupler", "name": "KNX Line Coupler", "category": "line_coupler", "moduleWidth": 2, "channels": 1, "busMa": 15, "color": "#475569"},
+    # 24V DC besleme (Android paneller vb.) — KNX bus cihazı DEĞİL
+    {"id": "psu24-30", "name": "24V DC Güç Kaynağı 30W (1.25A)", "category": "psu24", "moduleWidth": 2, "channels": 0, "color": "#0e7490"},
+    {"id": "psu24-60", "name": "24V DC Güç Kaynağı 60W (2.5A)", "category": "psu24", "moduleWidth": 4, "channels": 0, "color": "#0e7490"},
+    {"id": "psu24-100", "name": "24V DC Güç Kaynağı 100W (4.2A)", "category": "psu24", "moduleWidth": 6, "channels": 0, "color": "#155e75"},
     # Switch
     {"id": "relay8", "name": "Switch Aktüatör 8 Kanal", "category": "relay", "moduleWidth": 8, "channels": 8, "busMa": 15, "color": "#16a34a"},
     {"id": "relay12", "name": "Switch Aktüatör 12 Kanal", "category": "relay", "moduleWidth": 12, "channels": 12, "busMa": 15, "color": "#16a34a"},
@@ -357,6 +363,9 @@ for _d in ROOM_DEVICES:
 
 LOAD_TYPES = {d["type"] for d in ROOM_DEVICES if d["kind"] in ("load", "control")}
 CONTROL_TYPES = {d["type"] for d in ROOM_DEVICES if d["kind"] == "control"}
+SUPPLY24_TYPES = {d["type"] for d in ROOM_DEVICES if d.get("supply") == "24V DC"}
+POE_TYPES = {d["type"] for d in ROOM_DEVICES if d.get("poe")}   # 24V yerine PoE ile de beslenebilir
+NON_BUS_CATEGORIES = {"power_supply", "psu24"}   # bus akımı / fiziksel adres yok
 BUS_TYPES = {d["type"] for d in ROOM_DEVICES if d["kind"] == "bus"}
 
 

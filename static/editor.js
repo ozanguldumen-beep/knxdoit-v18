@@ -755,9 +755,15 @@ function connectEnergy(to) {
   pick = null;
   $("hint").textContent = HINTS.energy;
   changed();
-  const chTag = String(found.prod.id).startsWith("dr_") ? "R" : "K";
-  toast(res.warn || `Bağlandı: ${found.prod.name} ${chTag}${state.links.at(-1).ch + 1} → ${targetName(to)}`,
-    res.warn ? "warn" : "info");
+  const isDr = String(found.prod.id).startsWith("dr_");
+  const chTag = isDr ? "R" : "K";
+  const msg = `Bağlandı: ${found.prod.name} ${chTag}${state.links.at(-1).ch + 1} → ${targetName(to)}`;
+  if (isDr) {
+    toast((res.warn ? res.warn + " " : "") + msg +
+      " · Dikkat: dahili röle maks. 1 A (≈230 W rezistif; LED sürücülerde ani akım nedeniyle daha az).", "warn");
+  } else {
+    toast(res.warn || msg, res.warn ? "warn" : "info");
+  }
 }
 
 function pickBus(node) {
@@ -904,7 +910,7 @@ function deviceGroupsHtml(btnClass, attr, chosen) {
   return order.map(([g, list]) => `
     <div class="ed-group">${esc(g)}</div>
     ${list.map(d => `<button type="button" class="${btnClass} ${d.id === chosen ? "on" : ""}" ${attr}="${d.id}"
-        title="${esc([d.desc, d.sku ? "Stok kodu: " + d.sku : "", d.relays ? d.relays + " dahili röle çıkışı" : ""].filter(Boolean).join(" · "))}">
+        title="${esc([d.desc, d.sku ? "Stok kodu: " + d.sku : "", d.relays ? d.relays + " dahili röle çıkışı" + (d.relayAmps ? " (maks. " + d.relayAmps + " A)" : "") : "", d.supply ? d.supply + (d.poe ? " veya PoE" : "") + " besleme gerekir" : ""].filter(Boolean).join(" · "))}">
         <span class="ic">${d.icon}</span><span class="nm">${esc(d.label)}</span>
         <small class="${d.kind === "bus" ? "k" : d.kind === "control" ? "c" : "e"}">${d.kind === "bus" ? "KNX" : d.kind === "control" ? "Gateway" : "230V"}</small>
       </button>`).join("")}`).join("");
