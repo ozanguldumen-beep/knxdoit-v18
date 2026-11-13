@@ -8,6 +8,7 @@ import {
 } from "./devices.js";
 import { renderHealth, escapeHtml } from "./rules.js";
 import { downloadFile } from "./pdf.js";
+import { drawPanel } from "./canvas.js";
 
 const $ = id => document.getElementById(id);
 const esc = escapeHtml;
@@ -45,6 +46,10 @@ let cur = 0;
 let tool = "select";
 let pick = null;          // enerji: {prod, ch} · bus: "node"
 let undoStack = [];
+let selRoom = null;       // seçili oda id (cihazlar buraya eklenir)
+let selPanel = null;      // seçili pano id (ürünler buraya eklenir)
+let zoom = 1;
+let view = "plan";
 let dirty = false;
 let projectId = JSON.parse($("projectId").textContent);
 
@@ -279,8 +284,13 @@ function render() {
     (f.rooms.length + f.panels.length + f.collectors.length === 0
       ? `<div class="ed-empty">Başlamak için soldan <b>▭ Oda Çiz</b> veya <b>▪ Pano Çiz</b> seçip boş alanda sürükleyin.</div>`
       : "");
+  fixSelection();
   markPick();
+  markSelection();
   drawWires();
+  renderTargets();
+  renderStats();
+  if (view === "din") renderDin();
   $("cableCount").textContent =
     `${state.links.filter(l => l.floor === f.id).length} enerji · ` +
     `${state.bus.filter(e => e.floor === f.id).length} bus kablosu (bu kat)`;
@@ -303,7 +313,7 @@ function roomHtml(r) {
         <span class="ic">${info.icon}</span><span class="n">${k + 1}</span></button>`;
     })
   ).join("");
-  return `<div class="rbox" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;min-height:${r.h}px">
+  return `<div class="rbox" data-room="${r.id}" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;min-height:${r.h}px">
     <div class="rhdr" data-drag="room:${r.id}"><span>${esc(r.name)}</span><small>${total} cihaz</small></div>
     <div class="chips">${chips}</div>
     <button class="addbtn" data-add-dev="${r.id}">+ Cihaz Ekle</button>
@@ -339,7 +349,7 @@ function panelHtml(p, occ) {
       ${chs}
     </div>`;
   }).join("");
-  return `<div class="pbox" style="left:${p.x}px;top:${p.y}px">
+  return `<div class="pbox" data-panel="${p.id}" style="left:${p.x}px;top:${p.y}px">
     <div class="phdr" data-drag="panel:${p.id}">
       <span>${esc(p.name)}</span>
       <button class="busport" id="bp-${p.id}" data-node="panel:${p.id}" title="KNX bus çıkışı">BUS ●</button>
@@ -377,7 +387,10 @@ function markPick() {
 function center(el) {
   const s = stage.getBoundingClientRect();
   const r = el.getBoundingClientRect();
-  return { x: r.left - s.left + r.width / 2, y: r.top - s.top + r.height / 2 };
+  return {
+    x: (r.left - s.left + r.width / 2) / zoom,
+    y: (r.top - s.top + r.height / 2) / zoom
+  };
 }
 
 function nodeEl(node) {
@@ -505,7 +518,7 @@ let dragging = null;
 
 function stagePoint(e) {
   const s = stage.getBoundingClientRect();
-  return { x: e.clientX - s.left, y: e.clientY - s.top };
+  return { x: (e.clientX - s.left) / zoom, y: (e.clientY - s.top) / zoom };
 }
 
 cv.addEventListener("mousedown", e => {
@@ -518,6 +531,8 @@ cv.addEventListener("mousedown", e => {
     const obj = floor()[kind === "room" ? "rooms" : kind === "panel" ? "panels" : "collectors"]
       .find(o => o.id === id);
     if (!obj) return;
+    if (kind === "room" && selRoom !== id) { selRoom = id; markSelection(); renderTargets(); }
+    if (kind === "panel" && selPanel !== id) { selPanel = id; markSelection(); renderTargets(); }
     const p = stagePoint(e);
     dragging = { obj, el: handle.parentElement, dx: p.x - obj.x, dy: p.y - obj.y, moved: false, snap: JSON.stringify({ state, cur }) };
     e.preventDefault();
@@ -580,17 +595,25 @@ function createShape(kind, r) {
       `<label>Oda adı<input id="mName" value="Oda ${f.rooms.length + 1}"></label>`,
       () => {
         snapshot();
-        f.rooms.push({ id: uid(), name: $("mName").value.trim() || "Oda", x: r.x, y: r.y,
-          w: Math.max(r.w, 150), h: Math.max(r.h, 90), devices: [] });
+        const id = uid();
+        f.rooms.push({ id, name: $("mName").value.trim() || "Oda", x: r.x, y: r.y,
+          w: Math.max(r.w, 170), h: Math.max(r.h, 100), devices: [] });
+        selRoom = id;
+        setTool("select");
         changed();
+        toast("Oda eklendi. Soldaki listeden bu odaya cihaz ekleyebilirsiniz.");
       });
   } else if (kind === "panel") {
     openModal("Pano Ekle",
       `<label>Pano adı<input id="mName" value="${esc(f.name)} Panosu"></label>`,
       () => {
         snapshot();
-        f.panels.push({ id: uid(), name: $("mName").value.trim() || "Pano", x: r.x, y: r.y, products: [] });
+        const id = uid();
+        f.panels.push({ id, name: $("mName").value.trim() || "Pano", x: r.x, y: r.y, products: [] });
+        selPanel = id;
+        setTool("select");
         changed();
+        toast("Pano eklendi. Soldaki listeden ürün ekleyebilirsiniz.");
       });
   } else if (kind === "collector") {
     openModal("Kollektör Dolabı Ekle",
@@ -614,9 +637,16 @@ cv.addEventListener("click", e => {
   const t = e.target;
 
   const addDev = t.closest("[data-add-dev]");
-  if (addDev) return showDeviceModal(addDev.dataset.addDev);
+  if (addDev) { selRoom = addDev.dataset.addDev; markSelection(); renderTargets(); return showDeviceModal(addDev.dataset.addDev); }
   const addProd = t.closest("[data-add-prod]");
-  if (addProd) return showProductModal(addProd.dataset.addProd);
+  if (addProd) { selPanel = addProd.dataset.addProd; markSelection(); renderTargets(); return showProductModal(addProd.dataset.addProd); }
+
+  // Seçim: odaya / panoya tıklanınca sol paneldeki hedef o olur
+  if (tool === "select" || tool === "energy" || tool === "bus") {
+    const rb = t.closest("[data-room]"), pb = t.closest("[data-panel]");
+    if (rb && rb.dataset.room !== selRoom) { selRoom = rb.dataset.room; markSelection(); renderTargets(); }
+    if (pb && pb.dataset.panel !== selPanel) { selPanel = pb.dataset.panel; markSelection(); renderTargets(); }
+  }
 
   const ch = t.closest("[data-ch]");
   const chip = t.closest("[data-dev]");
@@ -855,6 +885,152 @@ function showProductModal(panelId) {
 }
 
 // --------------------------------
+// SEÇİM, SOL PANEL, SAYAÇLAR
+// --------------------------------
+
+function fixSelection() {
+  const f = floor();
+  if (!f.rooms.some(r => r.id === selRoom)) selRoom = f.rooms.length ? f.rooms[f.rooms.length - 1].id : null;
+  if (!f.panels.some(p => p.id === selPanel)) selPanel = f.panels.length ? f.panels[0].id : null;
+}
+
+function markSelection() {
+  document.querySelectorAll(".rbox.selected,.pbox.selected").forEach(e => e.classList.remove("selected"));
+  if (selRoom) document.querySelector(`.rbox[data-room="${selRoom}"]`)?.classList.add("selected");
+  if (selPanel) document.querySelector(`.pbox[data-panel="${selPanel}"]`)?.classList.add("selected");
+}
+
+function renderTargets() {
+  const f = floor();
+  $("roomSelect").innerHTML = f.rooms.length
+    ? f.rooms.map(r => `<option value="${r.id}" ${r.id === selRoom ? "selected" : ""}>${esc(r.name)}</option>`).join("")
+    : `<option value="">Önce oda çizin</option>`;
+  const panelOpts = f.panels.length
+    ? f.panels.map(p => `<option value="${p.id}" ${p.id === selPanel ? "selected" : ""}>${esc(p.name)}</option>`).join("")
+    : `<option value="">Yeni pano otomatik açılır</option>`;
+  $("panelSelect").innerHTML = panelOpts;
+  $("dinPanel").innerHTML = f.panels.length ? panelOpts : `<option value="">Pano yok</option>`;
+}
+
+$("roomSelect").onchange = e => { selRoom = e.target.value || null; markSelection(); };
+$("panelSelect").onchange = e => { selPanel = e.target.value || null; markSelection(); if (view === "din") renderDin(); };
+$("dinPanel").onchange = e => { selPanel = e.target.value || null; renderTargets(); renderDin(); };
+
+function renderStats() {
+  let rooms = 0, products = 0;
+  for (const f of state.floors) {
+    rooms += f.rooms.length;
+    for (const p of f.panels) products += p.products.length;
+    for (const r of f.rooms) for (const d of r.devices) products += d.count;
+    for (const c of f.collectors) products += c.valves;
+  }
+  $("roomCount").textContent = rooms;
+  $("productCount").textContent = products;
+}
+
+function buildSideLists() {
+  $("deviceList").innerHTML = ROOM_DEVICES.map(d => `
+    <button class="ed-item" data-side-dev="${d.type}">
+      <span class="ic">${d.icon}</span><span class="nm">${d.label}</span>
+      <small class="${d.energy ? "e" : "k"}">${d.energy ? "230V" : "KNX"}</small>
+    </button>`).join("");
+
+  const groups = {};
+  PANEL_PRODUCTS.forEach(p => (groups[p.category] = groups[p.category] || []).push(p));
+  $("productList").innerHTML = Object.entries(groups).map(([cat, list]) => `
+    <div class="ed-group">${CATEGORY_LABEL[cat] || cat}</div>
+    ${list.map(p => `<button class="ed-item" data-side-prod="${p.id}">
+        <span class="nm">${esc(p.name.replace(/^KNX /, ""))}</span>
+        <small>${p.moduleWidth}M · ${p.psuMa ? p.psuMa + " mA" : p.channels + "K"}</small>
+      </button>`).join("")}`).join("");
+}
+
+$("deviceList").addEventListener("click", e => {
+  const b = e.target.closest("[data-side-dev]");
+  if (!b) return;
+  const room = floor().rooms.find(r => r.id === selRoom);
+  if (!room) {
+    setTool("room");
+    return toast("Önce bir oda çizin: boş alanda sürükleyin.", "warn");
+  }
+  const type = b.dataset.sideDev;
+  const qty = Math.min(50, Math.max(1, Number($("devQty").value) || 1));
+  const label = DEV[type].label;
+  snapshot();
+  const ex = room.devices.find(d => d.type === type && d.label === label);
+  if (ex) ex.count += qty; else room.devices.push({ id: uid(), type, label, count: qty });
+  changed();
+  toast(`${room.name}: ${qty} adet ${label} eklendi.`);
+});
+
+$("productList").addEventListener("click", e => {
+  const b = e.target.closest("[data-side-prod]");
+  if (!b) return;
+  const f = floor();
+  snapshot();
+  let panel = f.panels.find(p => p.id === selPanel);
+  if (!panel) {
+    // Pano yoksa otomatik aç: odaların sağına yerleştir
+    const right = f.rooms.reduce((m, r) => Math.max(m, r.x + r.w), 0);
+    panel = { id: uid(), name: `${f.name} Panosu`, x: Math.max(700, right + 80), y: 40, products: [] };
+    f.panels.push(panel);
+    selPanel = panel.id;
+  }
+  const cat = PANEL_PRODUCTS.find(p => p.id === b.dataset.sideProd);
+  panel.products.push({ ...cat, pid: cat.id, id: uid() });
+  changed();
+  toast(`${panel.name}: ${cat.name} eklendi.`);
+});
+
+// --------------------------------
+// GÖRÜNÜM: Plan / DIN, yakınlaştırma, sağ panel
+// --------------------------------
+
+function renderDin() {
+  const f = floor();
+  const panel = f.panels.find(p => p.id === selPanel);
+  const letters = { light: "L", dim: "D", curtain: "M", valve: "V", onoff: "O", thermostat: "T", switch: "K", sensor: "S" };
+  drawPanel($("panelCanvas"), {
+    name: f.name,
+    title: panel ? `${panel.name} (DIN ray)` : `${f.name}: pano yok`,
+    panelProducts: panel ? panel.products : [],
+    rooms: f.rooms.map(r => ({
+      name: r.name,
+      devices: r.devices.map(d => ({ ...d, letter: letters[d.type] }))
+    }))
+  });
+}
+
+document.querySelectorAll("[data-view]").forEach(b => b.onclick = () => {
+  view = b.dataset.view;
+  document.querySelectorAll("[data-view]").forEach(x => x.classList.toggle("active", x === b));
+  $("planView").classList.toggle("hidden", view !== "plan");
+  $("dinView").classList.toggle("hidden", view !== "din");
+  if (view === "din") renderDin(); else drawWires();
+});
+
+function applyZoom(z) {
+  zoom = Math.min(1.5, Math.max(0.5, Math.round(z * 10) / 10));
+  stage.style.transform = `scale(${zoom})`;
+  $("sizer").style.width = 2400 * zoom + "px";
+  $("sizer").style.height = 1600 * zoom + "px";
+  $("zoomRange").value = Math.round(zoom * 100);
+  $("zoomReset").textContent = Math.round(zoom * 100) + "%";
+  $("panelCanvas").style.width = 980 * zoom + "px";
+}
+$("zoomRange").oninput = e => applyZoom(Number(e.target.value) / 100);
+$("zoomOut").onclick = () => applyZoom(zoom - 0.1);
+$("zoomIn").onclick = () => applyZoom(zoom + 0.1);
+$("zoomReset").onclick = () => applyZoom(1);
+
+function setRight(show) {
+  $("rightPanel").classList.toggle("hidden", !show);
+  $("toggleRight").textContent = show ? "Adresler ⟩" : "⟨ Adresler";
+  try { localStorage.setItem("knx.right", show ? "1" : "0"); } catch (e) { /* yok say */ }
+}
+$("toggleRight").onclick = () => setRight($("rightPanel").classList.contains("hidden"));
+
+// --------------------------------
 // KATLAR
 // --------------------------------
 
@@ -922,6 +1098,7 @@ async function runCheck() {
     const data = await res.json();
     if (seq !== checkSeq) return;
     renderHealth($("ruleWarnings"), data);
+    $("gaCount").textContent = (data.group_addresses || []).length;
 
     let lastMain = null;
     $("gaList").innerHTML = (data.group_addresses || []).slice(0, 300).map(g => {
@@ -1008,6 +1185,11 @@ function fromV18(saved) {
     $("dirty").textContent = "✓ Kaydedildi";
   }
   prune();
+  buildSideLists();
+  applyZoom(1);
+  let showRight = true;
+  try { showRight = localStorage.getItem("knx.right") !== "0"; } catch (e) { /* yok say */ }
+  setRight(showRight);
   setTool("select");
   render();
   runCheck();

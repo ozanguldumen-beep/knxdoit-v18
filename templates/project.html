@@ -4,11 +4,25 @@
 {% block content %}
 <div class="ed">
 
-  <!-- ÜST ARAÇ ÇUBUĞU -->
+  <!-- ÜST ÇUBUK -->
   <header class="ed-top">
     <input id="projectName" class="ed-name" value="KNXdoit Projesi" aria-label="Proje adı">
     <div id="floorTabs" class="ed-tabs"></div>
     <button id="addFloor" class="ed-soft">+ Kat</button>
+
+    <div class="ed-stats">
+      <div><b id="roomCount">0</b><span>Oda</span></div>
+      <div><b id="productCount">0</b><span>Ürün</span></div>
+      <div><b id="gaCount">0</b><span>GA</span></div>
+    </div>
+
+    <div class="ed-zoom">
+      <button id="zoomOut" class="ed-soft" title="Uzaklaş">−</button>
+      <input id="zoomRange" type="range" min="50" max="150" step="10" value="100" aria-label="Yakınlaştırma">
+      <button id="zoomIn" class="ed-soft" title="Yakınlaş">+</button>
+      <button id="zoomReset" class="ed-soft">100%</button>
+    </div>
+
     <div class="ed-top-right">
       <span id="dirty" class="ed-dirty"></span>
       <button id="undoBtn" class="ed-soft" title="Geri al (Ctrl+Z)">↶ Geri Al</button>
@@ -16,36 +30,78 @@
       <button id="saveBtn" class="ed-soft">💾 Kaydet</button>
       <button id="pdfBtn" class="ed-blue">PDF</button>
       <button id="knxBtn" class="ed-green">.knxproj</button>
+      <button id="toggleRight" class="ed-soft" title="Adres panelini gizle / göster">Adresler ⟩</button>
     </div>
   </header>
 
   <div class="ed-body">
 
-    <!-- SOL: ARAÇLAR -->
-    <nav class="ed-tools" id="tools">
-      <div class="ed-cat">Seç</div>
-      <button data-tool="select">✋ Taşı / Seç</button>
-      <div class="ed-cat">Çiz</div>
-      <button data-tool="room">▭ Oda Çiz</button>
-      <button data-tool="panel">▪ Pano Çiz</button>
-      <button data-tool="collector">🔥 Kollektör Dolabı</button>
-      <div class="ed-cat">Kablo</div>
-      <button data-tool="energy">🟫 Enerji Kablosu</button>
-      <button data-tool="bus">🟩 KNX Bus Kablosu</button>
-      <div class="ed-cat">Düzenle</div>
-      <button data-tool="rename">✏️ İsim Değiştir</button>
-      <button data-tool="delete">🗑 Sil</button>
-    </nav>
+    <!-- SOL PANEL -->
+    <aside class="ed-left">
+      <section>
+        <h4>Araçlar</h4>
+        <div class="ed-toolgrid" id="tools">
+          <button data-tool="select">✋ Taşı / Seç</button>
+          <button data-tool="room">▭ Oda Çiz</button>
+          <button data-tool="panel">▪ Pano Çiz</button>
+          <button data-tool="collector">🔥 Kollektör</button>
+          <button data-tool="energy">🟫 Enerji Kablosu</button>
+          <button data-tool="bus">🟩 Bus Kablosu</button>
+          <button data-tool="rename">✏️ İsim</button>
+          <button data-tool="delete">🗑 Sil</button>
+        </div>
+      </section>
 
-    <!-- ORTA: ÇİZİM ALANI -->
+      <section>
+        <h4>Odaya Cihaz Ekle</h4>
+        <div class="ed-target">
+          <select id="roomSelect" aria-label="Hedef oda"></select>
+          <label class="ed-qty">Adet <input id="devQty" type="number" min="1" max="50" value="1"></label>
+        </div>
+        <div id="deviceList" class="ed-list"></div>
+      </section>
+
+      <section>
+        <h4>Panoya Ürün Ekle</h4>
+        <div class="ed-target">
+          <select id="panelSelect" aria-label="Hedef pano"></select>
+        </div>
+        <div id="productList" class="ed-list"></div>
+      </section>
+
+      <section>
+        <h4>Proje Sağlığı</h4>
+        <div id="ruleWarnings" class="ed-health">Kontrol ediliyor…</div>
+      </section>
+    </aside>
+
+    <!-- ORTA -->
     <main class="ed-center">
-      <div id="hint" class="ed-hint"></div>
-      <div id="scroller" class="ed-scroller">
-        <div id="stage" class="ed-stage">
-          <div id="cv" class="ed-cv"></div>
-          <canvas id="wc" class="ed-wc" width="2400" height="1600"></canvas>
+      <div class="ed-viewbar">
+        <div class="ed-views">
+          <button data-view="plan" class="active">Kat Planı &amp; Kablolar</button>
+          <button data-view="din">DIN Ray Pano</button>
+        </div>
+        <div id="hint" class="ed-hint"></div>
+      </div>
+
+      <div id="planView" class="ed-scroller">
+        <div id="sizer" class="ed-sizer">
+          <div id="stage" class="ed-stage">
+            <div id="cv" class="ed-cv"></div>
+            <canvas id="wc" class="ed-wc" width="2400" height="1600"></canvas>
+          </div>
         </div>
       </div>
+
+      <div id="dinView" class="ed-scroller ed-din hidden">
+        <div class="ed-din-head">
+          <select id="dinPanel" aria-label="Pano"></select>
+          <span>Gerçek DIN ray yerleşimi · modül genişliğine göre</span>
+        </div>
+        <canvas id="panelCanvas" width="980" height="720"></canvas>
+      </div>
+
       <footer class="ed-legend">
         <span><i class="lg lg-energy"></i> Enerji kablosu (230V)</span>
         <span><i class="lg lg-bus"></i> KNX bus kablosu (30V DC)</span>
@@ -53,10 +109,8 @@
       </footer>
     </main>
 
-    <!-- SAĞ: KURALLAR + ADRESLER -->
-    <aside class="ed-right">
-      <h3>Proje Sağlığı</h3>
-      <div id="ruleWarnings" class="ed-health">Kontrol ediliyor…</div>
+    <!-- SAĞ: ADRESLER (gizlenebilir) -->
+    <aside id="rightPanel" class="ed-right">
       <h3>Fiziksel Adresler</h3>
       <p class="rp-hint">Alan.Hat.Cihaz · her kat bir hat</p>
       <div id="paList"></div>

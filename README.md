@@ -1,4 +1,4 @@
-# KNXdoit v19
+# KNXdoit v20
 
 Bayiler için KNX proje sihirbazı: kat/oda/pano tasarımı, KNX kural kontrolü,
 elektrikçi PDF'i ve `.knxproj` çıktısı.
